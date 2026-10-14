@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: macOS, Node.js 22, dns-sd, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.1.0"
+  version: "0.1.1"
 ---
 
 # Aside 电脑 Skill
@@ -48,7 +48,7 @@ node scripts/client.mjs help
 node scripts/client.mjs browse
 ```
 
-确定 `base` 之后只用那一条。如果 `devices` 是空的，请用户确认已经打开过内容终端，并且没有锁屏、没有离开大约三分钟、也没有点过结束连接。手机和电脑要在同一个 Wi-Fi，并允许本地网络。离开这一页本身不会让列表变空。页面不提供地址。不要扫描网段，也不要向用户要 `host:port`。
+确定 `base` 之后只用那一条。能解析到局域网 IPv4 时，`base` 就是这个地址，`ipv4` 字段也是它。`*.local` 只是 Bonjour 名字，不是挂载地址。这一步没有扫网段，只查询已经浏览到的那台手机。如果 `devices` 是空的，请用户确认已经打开过内容终端，并且没有锁屏、没有离开大约三分钟、也没有点过结束连接。手机和电脑要在同一个 Wi-Fi，并允许本地网络。离开这一页本身不会让列表变空。页面不提供地址。不要扫描网段，也不要向用户要 `host:port`。
 4. 先发现，再判断版本：
 
 ```bash
@@ -90,7 +90,7 @@ node scripts/client.mjs mount \
   --credential-file /path/to/aside-agent-credential
 ```
 
-成功后库在 `/aside`。`/` 就是手机上当前登录的资料库，下面是 `items`、`collections`、`tags`。地址只在挂载参数里带 `allowPrivateNetwork=true`，凭证不进 URI。不要自己拼 `arc afs mount add`，也不要把凭证打出来。
+成功后库在 `/aside`。`/` 就是手机上当前登录的资料库，下面是 `items`、`collections`、`tags`。客户端会把 Bonjour 的 `*.local` 解析成同一台手机的局域网 IPv4 再交给 arc。`allowPrivateNetwork=true` 作为挂载选项传入。只写在 URI 查询参数里会被 Arc 丢掉，随后 IPv6 链路本地地址会触发 SSRF，挂载失败。凭证不进 URI。不要自己拼 `arc afs mount add`，也不要把凭证打出来。挂载失败时不要改去扫描网段，也不要用 IPv6 链路本地地址。
 
 ```bash
 arc afs list /aside
@@ -251,7 +251,8 @@ node scripts/client.mjs delete-request \
 
 ## 不要做
 
-- 不要探测子网。只浏览 `_aside-agent._tcp`。不要把发现文档以外的字段当成入口，也不要把服务名当成凭证。
+- 不要探测子网。只浏览 `_aside-agent._tcp`，再解析已经发现的那台手机的局域网 IPv4。不要把发现文档以外的字段当成入口，也不要把服务名当成凭证。
+- 不要自己拼 `arc afs mount add`。不要把 `*.local` 或 IPv6 链路本地地址当成挂载地址。
 - 不要在 skill、日志或示例里放凭证、配对码或演示码。
 - 不要请求 `/user`、`/dev`、`/kv`。读库用 `/aside` 或本客户端，不要自己再挂一条会导出整棵树的服务。
 - 不要把 HTTP 确认当成删除，也不要在批量里放删除。

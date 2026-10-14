@@ -167,6 +167,102 @@ function runDnsSd(args, timeoutMs) {
   });
 }
 
+const IPV4_LITERAL = /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+
+export function isIPv4Literal(host) {
+  return IPV4_LITERAL.test(String(host));
+}
+
+function ipv4Rank(address) {
+  if (address.startsWith("192.168.")) return 0;
+  if (address.startsWith("10.")) return 1;
+  const second = Number(address.split(".")[1]);
+  if (address.startsWith("172.") && second >= 16 && second <= 31) return 2;
+  return 3;
+}
+
+function isUnusableIPv4(address) {
+  return address === "0.0.0.0" || address.startsWith("127.") || address.startsWith("169.254.");
+}
+
+/// A Bonjour hostname often has an IPv6 link-local address as well as a LAN IPv4.
+/// Arc rejects that link-local answer. Mount the LAN address, never a scanned subnet.
+export function preferLanIPv4(addresses) {
+  const seen = [];
+  for (const raw of addresses) {
+    const address = String(raw).trim();
+    if (!isIPv4Literal(address) || isUnusableIPv4(address) || seen.includes(address)) continue;
+    seen.push(address);
+  }
+  seen.sort((left, right) => ipv4Rank(left) - ipv4Rank(right));
+  return seen[0] ?? null;
+}
+
+export function selectMountHost(hostname, addresses = []) {
+  if (isIPv4Literal(hostname)) return hostname;
+  return preferLanIPv4(addresses);
+}
+
+export function parseDnsSdAddresses(text) {
+  return [...String(text).matchAll(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g)].map((match) => match[0]);
+}
+
+async function defaultLookupV4(hostname) {
+  const { lookup } = await import("node:dns/promises");
+  let timer;
+  try {
+    const records = await Promise.race([
+      lookup(hostname, { family: 4, all: true }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("timeout")), 1500);
+      }),
+    ]);
+    return records.map((record) => record.address);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function defaultDnsSdV4(hostname) {
+  const name = hostname.endsWith(".") ? hostname : `${hostname}.`;
+  try {
+    return parseDnsSdAddresses(await runDnsSd(["-G", "v4", name], 1500));
+  } catch {
+    return [];
+  }
+}
+
+export async function lookupLanAddresses(hostname, { lookup, getAddr } = {}) {
+  if (isIPv4Literal(hostname)) return [hostname];
+  const [fromNode, fromDnsSd] = await Promise.all([
+    lookup ? lookup(hostname) : defaultLookupV4(hostname),
+    getAddr ? getAddr(hostname) : defaultDnsSdV4(hostname),
+  ]);
+  return [...(fromNode ?? []), ...(fromDnsSd ?? [])];
+}
+
+export async function resolveMountHost(hostname, sources) {
+  const picked = selectMountHost(hostname, await lookupLanAddresses(hostname, sources));
+  if (picked) return picked;
+  throw new AsideAgentError({
+    message: `「${hostname}」没有局域网 IPv4。Bonjour 只给了手机的名字，IPv6 链路本地地址不能拿去挂载。请确认手机和电脑在同一个 Wi-Fi。不要扫描网段。`,
+  });
+}
+
+export function deviceEndpoint(name, resolved, addresses) {
+  const ipv4 = isIPv4Literal(resolved.host) ? resolved.host : preferLanIPv4(addresses);
+  const host = ipv4 ?? resolved.host;
+  return {
+    name,
+    host,
+    port: resolved.port,
+    base: `http://${host}:${resolved.port}`,
+    ...(ipv4 ? { ipv4 } : {}),
+  };
+}
+
 export async function browseAsideAgents({ timeoutMs = 2500, resolveMs = 1200 } = {}) {
   let browseText;
   try {
@@ -181,7 +277,15 @@ export async function browseAsideAgents({ timeoutMs = 2500, resolveMs = 1200 } =
   for (const name of parseBrowse(browseText)) {
     const resolved = parseResolve(await runDnsSd(["-L", name, SERVICE_TYPE, "local."], resolveMs));
     if (!resolved) continue;
-    devices.push({ name, ...resolved });
+    let addresses = [];
+    if (!isIPv4Literal(resolved.host)) {
+      try {
+        addresses = await lookupLanAddresses(resolved.host);
+      } catch {
+        addresses = [];
+      }
+    }
+    devices.push(deviceEndpoint(name, resolved, addresses));
   }
   return devices;
 }
@@ -438,11 +542,37 @@ function daemonIsUp(result) {
   return /Status:\s+up\b/.test(text) || /"running"\s*:\s*true/.test(text);
 }
 
-export async function mountLibrary({ base, credential, secrets = [], arc = arcBin() } = {}) {
+function requestedHost(base, url) {
+  const typed = String(base).includes("://") ? String(base) : `http://${base}`;
+  const hostport = typed.slice(typed.indexOf("://") + 3);
+  const colon = hostport.lastIndexOf(":");
+  const host = (colon > 0 ? hostport.slice(0, colon) : hostport).replace(/\.$/, "");
+  return host || url.hostname;
+}
+
+export async function mountLibrary({ base, credential, secrets = [], arc = arcBin(), resolveHost = resolveMountHost } = {}) {
   if (typeof credential !== "string" || credential.length < 8) {
     throw new AsideAgentError({ message: "缺少凭证。先配对并等手机允许，再挂载。", secrets });
   }
-  const uri = mountURI(base);
+  const url = assertBase(base);
+  const requested = requestedHost(base, url);
+  let host;
+  try {
+    host = await resolveHost(requested);
+  } catch (error) {
+    if (error instanceof AsideAgentError) throw error;
+    throw new AsideAgentError({
+      message: `没有解析到「${requested}」的局域网 IPv4。不要扫描网段，也不要改用 IPv6 链路本地地址。`,
+      secrets,
+    });
+  }
+  if (!isIPv4Literal(host)) {
+    throw new AsideAgentError({
+      message: `挂载需要局域网 IPv4，得到的是「${host}」。不要改用 IPv6 链路本地地址，也不要扫描网段。`,
+      secrets,
+    });
+  }
+  const uri = mountURI(`http://${host}:${url.port}`);
   if (uri.includes(credential)) {
     throw new AsideAgentError({ message: "挂载地址不能带凭证。", secrets });
   }
@@ -459,12 +589,14 @@ export async function mountLibrary({ base, credential, secrets = [], arc = arcBi
   await runProcess(arc, ["afs", "mount", "remove", ASIDE_MOUNT_PATH], secrets);
   const added = await runProcess(arc, [
     "afs", "mount", "add", ASIDE_MOUNT_PATH, uri,
+    "--set", "allowPrivateNetwork=true",
     "--set", `token=${credential}`,
     "--sensitive-args", "token",
   ], secrets);
   if (added.code !== 0) {
+    const detail = (added.stderr || added.stdout || "arc afs mount add 失败").trim();
     throw new AsideAgentError({
-      message: `没有挂上 ${ASIDE_MOUNT_PATH}。${added.stderr || added.stdout || "arc afs mount add 失败"}`.trim(),
+      message: `没有挂上 ${ASIDE_MOUNT_PATH}。${detail} 不要自己拼 arc afs mount add，也不要扫描网段。`.trim(),
       secrets,
     });
   }
