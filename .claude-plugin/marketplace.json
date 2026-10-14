@@ -1,0 +1,22 @@
+{
+  "name": "aside-skills",
+  "owner": {
+    "name": "ArcBlock",
+    "email": "contact@arcblock.io"
+  },
+  "metadata": {
+    "description": "Agent Skills for Aside. Connect a computer agent to an Aside phone on the same LAN and organize the current library.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "aside",
+      "description": "Connect to an Aside phone, mount the current library, and organize items from a computer agent.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/aside-agent"
+      ]
+    }
+  ]
+}
