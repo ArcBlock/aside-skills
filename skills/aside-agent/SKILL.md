@@ -1,11 +1,11 @@
 ---
 name: aside-agent
-description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，并把资料库挂到本地 AFS 的 /aside。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。不要扫描网段，不要导出 /user、/dev 或 /kv。
+description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，并用本客户端读写当前资料库。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。连接成功看同一条 base 上的 probe 和 capabilities。不要扫描网段，不要导出 /user、/dev 或 /kv，不要自己拼 arc afs mount add。
 license: Apache-2.0
 compatibility: macOS, Node.js 22, dns-sd, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.1.1"
+  version: "0.1.2"
 ---
 
 # Aside 电脑 Skill
@@ -24,7 +24,7 @@ Skill 不是安全边界。手机上的允许才是授权。电脑不能自己�
 - 工具：Node.js v22.16.0，运行 `scripts/client.mjs`
 - 没有交互式 Codex、Claude 或 Muse 会话。Muse 不是已支持的集成。不要把没跑过的工具写成支持。
 
-配对、领取和探针走 `POST /agent/v1` 和 `GET /agent/v1/discovery`。发现用系统 `dns-sd` 浏览 `_aside-agent._tcp`。领取凭证后把手机上的当前库挂到本机 AFS 的 `/aside`。内容走 AFS HTTP `POST /rpc`：目录用 `arc afs`，笔记、集合和把标签挂到 item 上用本客户端的 `exec /.actions/aside`。不请求 `/user`、`/dev`、`/kv`、`/afs`。不扫描网段。
+配对、领取和探针走 `POST /agent/v1` 和 `GET /agent/v1/discovery`。发现用系统 `dns-sd` 浏览 `_aside-agent._tcp`。连接成功是同一条 Bonjour `base` 上 `probe` 和 `capabilities` 都成功。内容走本客户端的 AFS HTTP `POST /rpc`，动作是 `exec /.actions/aside`。不请求 `/user`、`/dev`、`/kv`、`/afs`。不扫描网段。客户端可以尝试把库挂到 `/aside`，挂不上也不算连接失败。
 
 ## 安装
 
@@ -48,8 +48,8 @@ node scripts/client.mjs help
 node scripts/client.mjs browse
 ```
 
-确定 `base` 之后只用那一条。能解析到局域网 IPv4 时，`base` 就是这个地址，`ipv4` 字段也是它。`*.local` 只是 Bonjour 名字，不是挂载地址。这一步没有扫网段，只查询已经浏览到的那台手机。如果 `devices` 是空的，请用户确认已经打开过内容终端，并且没有锁屏、没有离开大约三分钟、也没有点过结束连接。手机和电脑要在同一个 Wi-Fi，并允许本地网络。离开这一页本身不会让列表变空。页面不提供地址。不要扫描网段，也不要向用户要 `host:port`。
-4. 先发现，再判断版本：
+确定 `base` 之后只用那一条。它是 Bonjour 给出的主机名和这一次的端口。端口每次打开终端都会变，不要复用上一场的端口。不要把这个地址改成 IPv4 或其他主机。如果 `devices` 是空的，请用户确认已经打开过内容终端，并且没有锁屏、没有离开大约三分钟、也没有点过结束连接。手机和电脑要在同一个 Wi-Fi，并允许本地网络。离开这一页本身不会让列表变空。页面不提供地址。不要扫描网段，也不要向用户要 `host:port`。
+4. 先发现，再判断版本。第一次可能连不上，用同一个 `base` 再试一次。不要换地址。
 
 ```bash
 node scripts/client.mjs discover --base http://HOST:PORT
@@ -68,9 +68,9 @@ node scripts/client.mjs pair \
 
 不要自己写 `--device-id`。省略时，客户端会带上这台电脑已经保存的固定标识。自己编一个新标识，手机会把这台电脑收成另一条连接。
 
-把返回的工具名、设备名和配对码给用户看，让用户和手机上的核对。配对码不是凭证。不要在电脑上调用允许。网上的允许接口会拒绝。
+把返回的工具名、设备名和配对码立刻给用户，并马上执行下面的 `wait-claim`。手机上的配对码大约 60 秒后过期，客户端默认只等 50 秒。不要在这个窗口里读源码、查实现或做别的事。配对码不是凭证。不要在电脑上调用允许。网上的允许接口会拒绝。
 
-6. 等用户在手机上点允许，然后领取凭证。允许之前领取会得到 `not-allowed`，这不代表码错了。
+6. 等用户在手机上点允许，然后领取凭证。允许之前领取会得到 `not-allowed`，这不代表码错了。窗口用完得到 `pairing-expired` 时，重新 `pair`，把新码给用户，不要沿用旧码。码过期通常是窗口被用完了，不是用户拒绝。
 
 ```bash
 node scripts/client.mjs wait-claim \
@@ -82,7 +82,9 @@ node scripts/client.mjs wait-claim \
 
 标准输出只有会话、过期时间和凭证文件路径，没有凭证本身。凭证空闲大约 15 分钟后过期，不落在手机磁盘上。成功的探针或读写会把这 15 分钟重新算起。没有请求就不会续期。过期后要重新配对，并再次等手机允许。没有已信任设备。
 
-7. 挂到本地 AFS。没有 `arc` 时，客户端会说明安装命令：`curl -fsSL https://arc.afsd.io/install.sh | bash`。装好后再挂。这一步会在本机守护进程没开时执行 `arc service start`，不会停止已经在跑的服务。挂载点固定是 `/aside`。再挂一次会先卸掉旧的，避免凭证叠在一起。
+7. 用同一个 `base` 做 `probe`，再做 `capabilities`。这两步都成功，连接就成功了。`tree` 里应有 items、collections、tags。写带嵌入的笔记还要看 `note.blocks`。一次内容请求失败，而 `probe` 仍然成功时，用同一个 `base` 再试那一次内容请求。不要重新配对，也不要换地址。只有 `probe` 也连不上时才重新 `browse`。浏览还能看到这台手机时，继续用原来的凭证。
+
+8. 挂到本地 AFS 是附加步骤，不是连接成功的条件。没有 `arc` 时，客户端会说明安装命令：`curl -fsSL https://arc.afsd.io/install.sh | bash`。装好后再挂。这一步会在本机守护进程没开时执行 `arc service start`，不会停止已经在跑的服务。挂载点固定是 `/aside`。再挂一次会先卸掉旧的，避免凭证叠在一起。
 
 ```bash
 node scripts/client.mjs mount \
@@ -90,7 +92,9 @@ node scripts/client.mjs mount \
   --credential-file /path/to/aside-agent-credential
 ```
 
-成功后库在 `/aside`。`/` 就是手机上当前登录的资料库，下面是 `items`、`collections`、`tags`。客户端会把 Bonjour 的 `*.local` 解析成同一台手机的局域网 IPv4 再交给 arc。`allowPrivateNetwork=true` 作为挂载选项传入。只写在 URI 查询参数里会被 Arc 丢掉，随后 IPv6 链路本地地址会触发 SSRF，挂载失败。凭证不进 URI。不要自己拼 `arc afs mount add`，也不要把凭证打出来。挂载失败时不要改去扫描网段，也不要用 IPv6 链路本地地址。
+客户端把 `allowPrivateNetwork=true` 作为挂载选项传给 arc。只写在 URI 查询参数里会被 arc 丢掉，局域网地址随后会触发 SSRF。凭证不进 URI。不要自己拼 `arc afs mount add`，也不要把凭证打出来。
+
+返回 `mounted: true` 时，库在 `/aside`。`/` 就是手机上当前登录的资料库，下面是 `items`、`collections`、`tags`。这时可以用：
 
 ```bash
 arc afs list /aside
@@ -98,13 +102,15 @@ arc afs list /aside/items
 arc afs read /aside/items/ITEM_ID
 ```
 
-不要 `arc afs delete`，也不要直接 `arc afs write`。这两条会被拒绝，不会改库。会话结束、probe 失败、锁屏、离开大约三分钟，或用户点了结束连接之后卸下：
+返回 `mounted: false` 且原因是私网拒绝时，告诉用户库还不能出现在 `/aside`，然后继续用本客户端。不要扫描网段，不要把地址改成 IPv4 或其他主机，也不要另挂一条服务。
+
+不要 `arc afs delete`，也不要直接 `arc afs write`。这两条会被拒绝，不会改库。会话结束、probe 失败、锁屏、离开大约三分钟，或用户点了结束连接之后，如果曾经挂上，再卸下：
 
 ```bash
 node scripts/client.mjs unmount
 ```
 
-8. 读取能力，不要写死示例条目路径或假数量：
+9. 读取能力也可以在第 7 步做完。不要写死示例条目路径或假数量：
 
 ```bash
 node scripts/client.mjs capabilities \
@@ -116,7 +122,7 @@ node scripts/client.mjs capabilities \
 
 ## 日常使用
 
-每次命令都带同一个 `--base` 和 `--credential-file`。这些命令不再请求 `/agent/v1/content`。它们对 `/rpc` 做 `exec /.actions/aside`，和 `/aside` 挂载用的是同一条连接。写操作每次新的变更用新的 `--operation-id`。同一次重试必须沿用同一个 id，并且正文参数完全一样。换了正文会被当成冲突，不会写成第二个对象。
+每次命令都带浏览得到的同一个 `--base` 和 `--credential-file`。这些命令不再请求 `/agent/v1/content`。它们对 `/rpc` 做 `exec /.actions/aside`。`/aside` 没有挂上时，读写仍然走这些命令。写操作每次新的变更用新的 `--operation-id`。同一次重试必须沿用同一个 id，并且正文参数完全一样。换了正文会被当成冲突，不会写成第二个对象。写完再读同一条，`resourceVersion` 和 `noteBlocks` 与写入返回一致，才算写成功。
 
 读：
 
@@ -237,7 +243,7 @@ node scripts/client.mjs delete-request \
 ## 恢复
 
 - 锁屏、离开大约三分钟，或用户点了结束连接：监听已停，旧凭证作废。请用户重新打开终端页。重新 `browse`。只有一台就直接用，多台再请用户选。然后重新配对并再次允许。不要扫描网段找新端口。
-- 用户只是离开了终端页，或短暂切到别的应用：连接还在，原来的 `base` 和凭证还能用。不要重新配对。一次请求失败时，先用同一个 `base` 再试。已经有凭证就先 `probe`，成功就继续，不要再 `pair`。连不上再 `browse`。浏览仍然能找到这台手机时，用原来的凭证，不要开第二场配对。
+- 用户只是离开了终端页，或短暂切到别的应用：连接还在，原来的 `base` 和凭证还能用。不要重新配对。一次内容请求失败，而 `probe` 仍然成功时，用同一个 `base` 再试那一次内容请求。不要重新配对，也不要重新浏览。已经有凭证就先 `probe`，成功就继续，不要再 `pair`。连不上再 `browse`。浏览仍然能找到这台手机时，用原来的凭证，不要开第二场配对。
 - 同一局域网：手机重启监听后，屏幕上的四位标记会变。多台时以这次浏览和手机上的标记为准。明文传输，不要把 Wi-Fi 当成信任。
 - 用户在手机上拒绝：客户端得到 `denied`。停下来问用户是否要重新配对。不要继续领取。
 - 配对超时或码已使用：得到 `pairing-expired` 或 `pairing-used`。重新 `pair`，让用户对照新的码。
@@ -251,8 +257,9 @@ node scripts/client.mjs delete-request \
 
 ## 不要做
 
-- 不要探测子网。只浏览 `_aside-agent._tcp`，再解析已经发现的那台手机的局域网 IPv4。不要把发现文档以外的字段当成入口，也不要把服务名当成凭证。
-- 不要自己拼 `arc afs mount add`。不要把 `*.local` 或 IPv6 链路本地地址当成挂载地址。
+- 不要探测子网。只浏览 `_aside-agent._tcp`。不要把发现文档以外的字段当成入口，也不要把服务名当成凭证。
+- 不要自己拼 `arc afs mount add`。挂载失败后不要改试别的地址。
+- 不要在配对窗口里读源码。先把配对码给用户，并马上 `wait-claim`。
 - 不要在 skill、日志或示例里放凭证、配对码或演示码。
 - 不要请求 `/user`、`/dev`、`/kv`。读库用 `/aside` 或本客户端，不要自己再挂一条会导出整棵树的服务。
 - 不要把 HTTP 确认当成删除，也不要在批量里放删除。

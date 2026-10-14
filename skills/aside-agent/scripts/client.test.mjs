@@ -10,20 +10,15 @@ import { fileURLToPath } from "node:url";
 import {
   ASIDE_MOUNT_PATH,
   AsideAgentClient,
-  AsideAgentError,
   assertBase,
   assertDiscovery,
   blockedContentAction,
-  deviceEndpoint,
-  isIPv4Literal,
   mountLibrary,
   mountURI,
   parseBrowse,
-  parseDnsSdAddresses,
   parseResolve,
-  preferLanIPv4,
+  privateNetworkMountFailure,
   redact,
-  selectMountHost,
   stableMachineId,
   unescapeDnsSd,
   unmountLibrary,
@@ -108,33 +103,15 @@ test("browse parses one Bonjour service and does not keep a removed name", () =>
   assert.equal(parseResolve("not a result"), null);
 });
 
-test("a Bonjour hostname mounts as its LAN IPv4, not a link-local address", () => {
-  assert.equal(isIPv4Literal("192.168.1.42"), true);
-  assert.equal(isIPv4Literal("NatetekiiPhone.local"), false);
-  assert.equal(isIPv4Literal("192.168.0.0/24"), false);
-  assert.equal(
-    preferLanIPv4(["fe80::abcd", "169.254.1.1", "127.0.0.1", "10.0.0.2", "192.168.1.20"]),
-    "192.168.1.20",
-  );
-  assert.equal(preferLanIPv4(["169.254.8.1"]), null);
-  assert.equal(selectMountHost("127.0.0.1"), "127.0.0.1");
-  assert.equal(selectMountHost("NatetekiiPhone.local", ["169.254.1.1", "192.168.1.42"]), "192.168.1.42");
-  const text = [
-    "14:22:33.456  Add     2 14 NatetekiiPhone.local.                  169.254.1.9                                  4500",
-    "14:22:33.789  Add     2 14 NatetekiiPhone.local.                  192.168.1.42                                 4500",
-  ].join("\n");
-  assert.deepEqual(parseDnsSdAddresses(text), ["169.254.1.9", "192.168.1.42"]);
-  const device = deviceEndpoint(
-    "Aside · iPhone · ab12",
-    { host: "NatetekiiPhone.local", port: 53123 },
-    parseDnsSdAddresses(text),
-  );
-  assert.equal(device.base, "http://192.168.1.42:53123");
-  assert.equal(device.ipv4, "192.168.1.42");
-  assert.equal(device.host, "192.168.1.42");
-  const unnamed = deviceEndpoint("Aside · iPhone · ab12", { host: "NatetekiiPhone.local", port: 53123 }, []);
-  assert.equal(unnamed.base, "http://NatetekiiPhone.local:53123");
-  assert.equal(unnamed.ipv4, undefined);
+test("arc private-network failures stay on the discovered address", () => {
+  const hostname = [
+    "Mount verification failed: could not reach provider at http://phone.local:9?allowPrivateNetwork=true.",
+    "hostname phone.local resolves to fe80::1 — IPv6 link-local (fe80::/10)",
+  ].join(" ");
+  const literal = "Mount verification failed (provider creation): URL http://192.168.0.2:9 is blocked — private network (192.168.0.0/16)";
+  assert.equal(privateNetworkMountFailure(hostname), true);
+  assert.equal(privateNetworkMountFailure(literal), true);
+  assert.equal(privateNetworkMountFailure("arc service start failed"), false);
 });
 
 test("one typed address is required and phone-only actions are not sent", async () => {
@@ -168,8 +145,11 @@ test("content uses afs rpc and mount hides the token", async () => {
   const skill = fs.readFileSync(path.join(skillRoot, "SKILL.md"), "utf8");
   assert.match(skill, /\/aside/);
   assert.match(skill, /allowPrivateNetwork/);
-  assert.match(skill, /局域网 IPv4/);
+  assert.match(skill, /probe 和 capabilities/);
+  assert.match(skill, /大约 60 秒/);
+  assert.match(skill, /马上/);
   assert.match(skill, /不要自己拼 `arc afs mount add`/);
+  assert.doesNotMatch(skill, /改成局域网 IPv4|解析成同一台手机的局域网 IPv4/);
   assert.match(skill, /exec \/\.actions\/aside/);
   assert.doesNotMatch(skill, /POST \/agent\/v1\/content/);
   assert.equal(mountURI("http://127.0.0.1:53123"), "http://127.0.0.1:53123?allowPrivateNetwork=true");
@@ -235,6 +215,7 @@ test("content uses afs rpc and mount hides the token", async () => {
     arc,
   });
   assert.equal(mounted.path, ASIDE_MOUNT_PATH);
+  assert.equal(mounted.mounted, true);
   assert.equal(mounted.uri, "http://127.0.0.1:53123?allowPrivateNetwork=true");
   assert.equal(JSON.stringify(mounted).includes(credential), false);
   const recorded = fs.readFileSync(argvLog, "utf8");
@@ -248,38 +229,62 @@ test("content uses afs rpc and mount hides the token", async () => {
   assert.equal(removed.removed, true);
   assert.equal(JSON.stringify(removed).includes(credential), false);
 
-  await assert.rejects(
-    () => mountLibrary({
-      base: "http://NatetekiiPhone.local:53123",
-      credential,
-      secrets: [credential],
-      arc,
-      resolveHost: async () => {
-        throw new AsideAgentError({ message: "「NatetekiiPhone.local」没有局域网 IPv4。不要扫描网段。" });
-      },
-    }),
-    /没有局域网 IPv4/,
-  );
-
+  fs.rmSync(argvLog, { force: true });
+  const blockedArc = path.join(scratch, "fake-arc-blocked.mjs");
+  fs.writeFileSync(blockedArc, [
+    "#!/usr/bin/env node",
+    "import fs from 'node:fs';",
+    "const line = JSON.stringify(process.argv.slice(2));",
+    `fs.appendFileSync(${JSON.stringify(argvLog)}, line + '\\n');`,
+    "const args = process.argv.slice(2);",
+    "if (args[0] === 'service' && args[1] === 'status') { process.stdout.write('Status:   up\\n'); process.exit(0); }",
+    "if (args[0] === 'afs' && args[2] === 'remove') process.exit(0);",
+    "if (args[0] === 'afs' && args[2] === 'add') {",
+    "  const uri = args[3];",
+    "  if (String(uri).includes('phone.local')) {",
+    "    process.stderr.write('Mount verification failed: hostname phone.local resolves to fe80::1 — IPv6 link-local (fe80::/10)\\n');",
+    "  } else {",
+    "    process.stderr.write('Mount verification failed (provider creation): URL http://192.168.0.2:53123 is blocked — private network (192.168.0.0/16)\\n');",
+    "  }",
+    "  process.exit(1);",
+    "}",
+    "process.stderr.write('unexpected\\n');",
+    "process.exit(1);",
+    "",
+  ].join("\n"));
+  fs.chmodSync(blockedArc, 0o755);
   fs.rmSync(argvLog, { force: true });
   const named = await mountLibrary({
-    base: "http://NatetekiiPhone.local:53123",
+    base: "http://phone.local:53123",
     credential,
     secrets: [credential],
-    arc,
-    resolveHost: async (hostname) => {
-      assert.equal(hostname, "NatetekiiPhone.local");
-      return "192.168.1.42";
-    },
+    arc: blockedArc,
   });
-  assert.equal(named.uri, "http://192.168.1.42:53123?allowPrivateNetwork=true");
+  assert.equal(named.mounted, false);
+  assert.equal(named.reason, "private-network");
+  assert.match(named.message, /同一个 base/);
+  assert.match(named.message, /不要自己拼 arc afs mount add/);
   assert.equal(JSON.stringify(named).includes(credential), false);
   const namedLog = fs.readFileSync(argvLog, "utf8");
-  assert.match(namedLog, /192\.168\.1\.42:53123/);
-  assert.equal(namedLog.includes("NatetekiiPhone"), false);
+  assert.match(namedLog, /phone\.local:53123/);
+  assert.equal(namedLog.includes("192.168.0.2"), false);
   const namedAdd = JSON.parse(namedLog.trim().split("\n").find((line) => line.includes('"add"')));
   assert.equal(namedAdd.includes("allowPrivateNetwork=true"), true);
   assert.equal(namedAdd.some((arg) => arg.startsWith("token=")), true);
+
+  fs.rmSync(argvLog, { force: true });
+  const literal = await mountLibrary({
+    base: "http://192.168.0.2:53123",
+    credential,
+    secrets: [credential],
+    arc: blockedArc,
+  });
+  assert.equal(literal.mounted, false);
+  assert.equal(literal.reason, "private-network");
+  const literalLog = fs.readFileSync(argvLog, "utf8");
+  const literalAdd = JSON.parse(literalLog.trim().split("\n").find((line) => line.includes('"add"')));
+  assert.equal(literalAdd.includes("http://192.168.0.2:53123?allowPrivateNetwork=true"), true);
+  assert.equal(literalAdd.includes("allowPrivateNetwork=true"), true);
 });
 
 test("set-item-tag sends setItemTag and stops when the phone cannot tag items", async () => {
