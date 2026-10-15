@@ -15,38 +15,29 @@
   English | <a href="./README.zh.md">中文</a>
 </p>
 
-Agent skills for [Aside](https://github.com/ArcBlock/aside). This repository is where those skills are maintained and installed. The iOS app, the content terminal, and the engineering protocol stay in the Aside app repository.
+Hand the library already on your [Aside](https://github.com/ArcBlock/aside) iPhone to the agent you use on your computer. Search, take notes, tag, and file things into collections. What gets written stays in the library that is signed in on the phone.
 
-## What is an Agent Skill?
+Aside collects links, photos, files, and notes into items you can open, tag, and group. The phone is the easy place to capture. A keyboard and the agent on your computer are the easy place to look through a lot of items, write something down, or sort a pile by topic. The skill in this repository is that bridge.
 
-An [Agent Skill](https://agentskills.io/specification) is a directory with a `SKILL.md` file. An agent reads the name and description at startup, then loads the full instructions when the task matches. Scripts and reference documents stay on disk until the agent needs them.
+## What you can do once connected
 
-```
-aside-skills/
-├── README.md
-├── README.zh.md
-├── LICENSE.md
-├── .claude-plugin/
-│   └── marketplace.json
-└── skills/
-    └── aside-agent/
-        ├── SKILL.md
-        ├── scripts/
-        │   ├── client.mjs
-        │   └── client.test.mjs
-        └── references/
-            └── protocol.md
-```
+In Claude Code, Cursor, Codex, Gemini CLI, or Grok, say “连接我的 Aside” (or “connect my Aside”). The agent finds the iPhone on the same Wi-Fi that has the connect page open, waits until you allow it on the phone, and then uses the **library that is signed in right now**.
 
-`name` in `SKILL.md` matches the directory name. The description says what the skill does and when to use it.
+**Save something onto the phone.** “Write down what we just discussed” creates a Quick Note. The body can be text. When this phone accepts rich notes, the note can also hold images, links, places, audio, files, and one short video. After writing, the agent reads the note back and checks that the phone and this write agree.
 
-## Skills
+**Find what you already saved.** “Find the Kyoto trip I saved” or “read that note.” The agent can search, page through results, read the body, and fetch images and attachments as the content itself.
 
-| Skill | Description |
-| --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | Connect a computer agent to an Aside phone on the same LAN, mount the current library at `/aside`, and organize it. Asking to write a note creates a Quick Note. |
+**Organize in place.** “Make a Reading list and put these in it” or “tag this one Travel.” Tags, collections, and membership are written back to the same library. An edit to an existing note carries the version just read, so a newer edit you made on the phone is left as it is.
 
-## Installation
+**Let file tools on the computer see the same library.** After pairing, the library can be mounted at `/aside`. `arc afs list /aside` shows items, collections, and tags. If [arc](https://arc.afsd.io) is missing, the client prints the install command. Search, notes, and organizing still go through this skill when the mount is unavailable.
+
+Several computers and several agents can be connected at once. The phone shows which tool, which computer, and what it is doing. You can disconnect one session. Changes already saved stay.
+
+Permanent delete needs a second confirmation on the phone. The agent can only ask “confirm deleting these items.” They are removed after you confirm. Cancel, timeout, or disconnect leaves the content where it is.
+
+## How to use it
+
+### 1. Install
 
 ```bash
 npx skills add ArcBlock/aside-skills
@@ -71,30 +62,79 @@ Or tell your agent:
 <details>
 <summary><b>Copy the skill directory</b></summary>
 
-Copy `skills/aside-agent` and keep `SKILL.md`, `scripts/`, and `references/` together.
+Copy the whole `skills/aside-agent` directory. Keep `SKILL.md`, `scripts/`, and `references/` together. The instructions alone are not enough.
 
 | Agent | Destination |
 | --- | --- |
 | Claude Code | `~/.claude/skills/aside-agent` |
 | Codex | `~/.codex/skills/aside-agent` |
-| Cursor | `~/.cursor/skills/aside-agent` or `.cursor/skills/aside-agent` |
+| Cursor | `~/.cursor/skills/aside-agent` or `.cursor/skills/aside-agent` in a project |
 | Grok | `~/.grok/skills/aside-agent` |
+
+The computer side runs on macOS with Node.js 22. The phone is discovered with the system Bonjour browser.
 
 </details>
 
-## Using aside-agent
+### 2. Open the connection on the iPhone
 
-On the phone, open Aside and the content terminal. Ask the agent to connect, or to write a note.
+Open Aside and tap **Connect an Agent** on the home screen (the link icon). The page title is 「等待连接」, and it tells you to say 「连接我的 Aside」 on the computer.
 
-The agent browses Bonjour `_aside-agent._tcp`. One phone is used directly. When several phones appear, match the four-character mark shown on the phone. The phone and the computer stay on the same LAN. This version uses cleartext TCP. Allowing the computer on the phone is what authorizes it.
+The first time, the system may ask for local network permission. Allow it.
 
-After pairing, the current library is mounted at `/aside`. If `arc` is missing, the client prints the install command and mounts after `arc` is available. Listing and reading use `arc afs`. Notes, collections, and tags go through the skill client.
+You can leave this page after opening it. A short switch to another app keeps the connection. It stops, and you open the page again, when you:
 
-A Quick Note can hold text. When the connected phone lists `note.blocks`, it can also hold images, links, places, audio, files, and one video. A phone that does not advertise `note` accepts text only. The procedure is in the skill.
+- lock the phone
+- tap 「结束连接」
+- stay away for about three minutes
+- switch library or account
 
-Before the agent reads the library, it tells you that the model service may receive what it read.
+The phone and the computer stay on the same Wi-Fi. While listening, the phone keeps the screen awake so auto-lock does not drop the connection. You can still lock it yourself. Locking stops the connection.
 
-## Development
+### 3. Say one sentence on the computer
+
+> 连接我的 Aside
+
+With one phone, the agent connects directly. With several, match the four-character mark at the bottom of the phone page. The page does not show an IP address or port.
+
+The agent sends the tool name, the computer name, and a six-digit pairing code into the chat. Check that same code on the phone and tap Allow. The code is good for about 60 seconds. Before you allow it, the agent cannot read bodies, attachments, tags, or collections.
+
+After that, the phone shows 「已连接」 and how many agent sessions are active.
+
+### 4. Ask for the work
+
+- “Find what I saved about publishing this week and read it to me.”
+- “Save the paragraph below as a note titled Monday discussion.”
+- “Create a collection called To sort and put the items you just read into it.”
+- “Tag this note Travel.”
+- “Change only the second paragraph of this note and leave the other blocks.”
+
+About 15 minutes with no read or write, and this allow expires. Say 「连接我的 Aside」 again and allow it on the phone. Every connection asks for allow.
+
+### 5. Finish
+
+Tap 「结束连接」 on the phone, or lock it. Notes, tags, and collections already written stay in the library.
+
+## How your content is touched
+
+Allow happens on the phone. Text in the skill does not replace that tap.
+
+Before the agent reads the library, it tells you that the AI tool may send what it read to its own cloud service.
+
+This version uses cleartext TCP on the local network. Until a pairing code or session credential expires, someone on the same Wi-Fi can see it. Open the connect page on a network you trust.
+
+The agent uses items, collections, and tags in the library that is signed in. The account directory, developer interfaces, and other system directories are outside this connection.
+
+When the phone advertises the capability, a Quick Note can hold text, images, links, places, audio, files, and one video. Up to 9 images. One video, no longer than 15 seconds. When the phone accepts text only, the agent writes text only.
+
+## Skills
+
+| Skill | Use it to |
+| --- | --- |
+| [aside-agent](./skills/aside-agent/SKILL.md) | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, search and read, tags, collections, and membership. |
+
+## Maintaining this repository
+
+The iOS app, the connect page, and the engineering protocol live in [ArcBlock/aside](https://github.com/ArcBlock/aside). This repository is how a computer agent connects and reads or writes. Change phone behavior in Aside first, then in this skill.
 
 The client has no npm dependencies. From this repository, with Node.js 22:
 
@@ -102,17 +142,19 @@ The client has no npm dependencies. From this repository, with Node.js 22:
 node --test skills/aside-agent/scripts/client.test.mjs
 ```
 
-That suite checks the client and the skill text. It does not build the iOS app. The suite that talks to the real foreground listener stays in [ArcBlock/aside](https://github.com/ArcBlock/aside) at `design/aside-agent-mode/skill/`.
+That suite checks the client and the skill text. It does not build the iOS app. The suite that talks to a real foreground listener stays in the Aside repository at `design/aside-agent-mode/skill/`.
 
-`skills/aside-agent/references/protocol.md` is the copy an agent reads. The engineering source is `design/aside-agent-mode/PROTOCOL.md` in the Aside app repository. The two copies can drift. A connected phone's `capabilities` response is what that phone accepts.
+`skills/aside-agent/references/protocol.md` is the copy an agent reads. The engineering source is `design/aside-agent-mode/PROTOCOL.md` in the Aside repository. The two copies can drift. A connected phone's `capabilities` response is what that phone accepts.
+
+The skill directory follows the [Agent Skills specification](https://agentskills.io/specification). An agent reads the name and description at startup, then loads the full instructions when the task matches.
 
 ## Contributing
 
-Open an [issue](https://github.com/ArcBlock/aside-skills/issues) or a pull request. Phone behavior changes belong in [ArcBlock/aside](https://github.com/ArcBlock/aside) first, then in this skill.
+Open an [issue](https://github.com/ArcBlock/aside-skills/issues) or a pull request.
 
 ## Related
 
-- [Aside](https://github.com/ArcBlock/aside) — the iOS app and the content terminal
+- [Aside](https://github.com/ArcBlock/aside) — the iPhone app, with Connect an Agent on the home screen
 - [Agent Skills specification](https://agentskills.io/specification)
 
 ## Author
