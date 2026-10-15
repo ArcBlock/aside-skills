@@ -18,6 +18,18 @@ export const ASIDE_MOUNT_PATH = "/aside";
 const PHONE_ONLY = new Set(["confirm", "confirmDelete", "allow"]);
 const RESOURCES = new Set(["items", "collections", "tags"]);
 const DELETE_MESSAGE = "手机需要确认后才会删除。电脑这次请求没有删除任何内容。";
+export const wakeAsideHint =
+  "请告诉用户把 Aside 唤醒到前台。授权还在，不需要重新允许。唤醒后再 browse，已有凭证就对这次的 base 先 probe。不要重新配对，不要扫描局域网。";
+
+export function connectionFailureMessage(base) {
+  return `连不上 ${base.hostname}:${base.port}。先用同一个地址再试一次。还是连不上，${wakeAsideHint}`;
+}
+
+export function browseResult(devices) {
+  const payload = { ok: true, serviceType: SERVICE_TYPE, devices };
+  if (devices.length === 0) payload.hint = `没有找到 Aside。${wakeAsideHint}`;
+  return payload;
+}
 
 export class AsideAgentError extends Error {
   constructor(fields) {
@@ -261,12 +273,11 @@ export class AsideAgentClient {
           });
         },
       );
-      req.on("error", (error) => {
+      req.on("error", () => {
         reject(new AsideAgentError({
           name: "AsideAgent.connection",
-          message: `连不上 ${this.base.hostname}:${this.base.port}。先用同一个地址再试一次。已有凭证时，先对这次浏览到的 base 做 probe，不要马上重新配对。端口每次监听打开都会变。离开内容终端页不会断开。锁屏或离开较久只是监听先停，授权还在，把手机带回前台即可。只有没有凭证、手机说 revoked，或用户拒绝，才重新配对。不要扫描局域网。`,
+          message: connectionFailureMessage(this.base),
           secrets: this.secrets,
-          error: { message: error.message },
         }));
       });
       if (payload) req.write(payload);
@@ -637,7 +648,7 @@ async function run(argv) {
       timeoutMs: Number(args["timeout-ms"] ?? 2500),
       resolveMs: Number(args["resolve-ms"] ?? 1200),
     });
-    return { ok: true, serviceType: SERVICE_TYPE, devices };
+    return browseResult(devices);
   }
   const credentialRequired = command !== "discover" && command !== "pair" && command !== "claim" && command !== "wait-claim";
   const client = clientFrom(args, secrets, { credentialRequired });

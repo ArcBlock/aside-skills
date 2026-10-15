@@ -13,6 +13,8 @@ import {
   assertBase,
   assertDiscovery,
   blockedContentAction,
+  browseResult,
+  connectionFailureMessage,
   mountLibrary,
   mountURI,
   parseBrowse,
@@ -76,6 +78,8 @@ test("skill text has no sample bearer or demo code", () => {
   assert.match(skill, /断开/);
   assert.match(skill, /library-changing/);
   assert.match(skill, /同一份/);
+  assert.match(skill, /唤醒到前台/);
+  assert.match(skill, /不需要重新允许/);
   assert.doesNotMatch(skill, /15 分钟后过期/);
   assert.doesNotMatch(skill, /锁屏后结束/);
   assert.doesNotMatch(skill, /也要确认/);
@@ -91,6 +95,26 @@ test("omitted device id stays the same for this computer", () => {
   assert.match(first, /^mac-[a-f0-9]{32}$/);
   const skill = fs.readFileSync(path.join(skillRoot, "SKILL.md"), "utf8");
   assert.match(skill, /不要自己写 `--device-id`/);
+});
+
+test("a missed phone tells the user to wake Aside and keep the grant", async () => {
+  const empty = browseResult([]);
+  assert.equal(empty.devices.length, 0);
+  assert.match(empty.hint, /唤醒到前台/);
+  assert.match(empty.hint, /不需要重新允许/);
+  assert.match(empty.hint, /不要重新配对/);
+  assert.equal(browseResult([{ name: "Aside" }]).hint, undefined);
+  const base = new URL("http://phone.local:9/");
+  assert.match(connectionFailureMessage(base), /phone\.local:9/);
+  assert.match(connectionFailureMessage(base), /唤醒到前台/);
+  const client = new AsideAgentClient({ base: "http://127.0.0.1:1" });
+  await assert.rejects(() => client.probe(), (error) => {
+    assert.match(error.message, /唤醒到前台/);
+    assert.match(error.message, /不需要重新允许/);
+    assert.match(error.toJSON().error.message, /唤醒到前台/);
+    assert.doesNotMatch(error.toJSON().error.message, /ECONNREFUSED/);
+    return true;
+  });
 });
 
 test("browse parses one Bonjour service and does not keep a removed name", () => {
