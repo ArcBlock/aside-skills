@@ -203,7 +203,7 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 | --- | --- | --- |
 | `capabilities` | `items` / `collections` / `tags` 目录是否存在，加上 `/.meta` 里路径恰好为 `/user` 的 operations。另有 `note.kind` 与 `note.blocks`。不倾倒正文，也不列出 `/dev` 或 `/kv` | `AFS.read("/.meta")` |
 | `list` | 分页列出。`resource` 为 `items`、`collections` 或 `tags` | `UserSpaceDocumentReader.listItems` / `listCollections` / `listTags` |
-| `query`、`search` | 同上，按标题、正文、名称过滤。空字符串返回空页 | 同上 |
+| `query`、`search` | `items` 走资料库索引，不先列出再做子串。前缀是 `tag:`、`collection:`、`type:`、`link:` / `site:`、`after:` / `before:`、`status:archived`。默认排除已归档，`status:archived` 才包括它们。空查询或纯空白是空页。只有前缀、没有关键字也会查索引。`collections` 和 `tags` 仍是名称子串（集合再加描述），按 id 排序，空查询是空页。返回仍是 `id`、`title`、`type`、`resourceVersion`，没有正文 | `LibrarySearchIndex`（items）；名称子串（collections、tags） |
 | `read` | 读一条。返回 `resourceVersion`。笔记的 `text` 原样读回。有 Quick Note 时另返回 `noteKind` 与不含字节的 `noteBlocks`。文章正文只从该条目自己的 `content.md` 载入 `markdown`，不接受调用方给的路径。`cover` 指向素材根下的普通文件时返回 `coverBase64` 与 `coverByteCount`。符号链接或逃出素材根的路径不返回字节 | `item(id:folder:)`、`collection(id:folder:)`、`listTags(folder:)` |
 | `readAttachment` | `contentBase64` 与 `byteCount`。只接受该条目 `attachments` 目录里的普通文件。符号链接（包括中间目录）、`.did-space/space.db`、附件目录外的文件都是 HTTP 403 `forbiddenError` / `attachment`。`lstat` 拒绝链接，`open(O_NOFOLLOW)` 不跟随最后一级。手机本地路径不是成功 | 清单上的相对路径，读文件字节 |
 | `createNote` | 保存一条 Quick Note。只有 `text` 时是一段文字。有 `blocks` 时以块为准，种类是 text、image、link、location、audio、file、video，不收 weather。侧车字节在 `contentBase64`。返回 `noteKind` 与不含字节的 `noteBlocks` | `UserSpaceDocumentWriter.createItem` |
@@ -217,7 +217,7 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 | `batch` | 逐项执行上面的非删除写操作 | 同上 |
 | `confirm`、`confirmDelete` | 网络上不能确认 | 返回 `aside.agent.allow` |
 
-`cursor` 是十进制偏移，缺省从 0 开始。`limit` 缺省 50，钳在 1...100。排序按 id。`nextCursor` 在还有剩余时给出。走完每一页不会漏。空库合法。列表项只有 `id`、`title`、`type`、`resourceVersion`。
+`cursor` 是十进制偏移，缺省从 0 开始。`limit` 缺省 50，钳在 1...100。不带 query 的 list 仍按 id 排序。items 的搜索顺序是索引顺序：精确 URL，精确标题，标题前缀，然后 bm25，然后 createdAt 降序。`nextCursor` 在还有剩余时给出。走完每一页不会漏。空库合法。列表项只有 `id`、`title`、`type`、`resourceVersion`。
 
 `resourceVersion` 是该 JSON 文件字节的 SHA-256 十六进制。它不是 schema `version`，也不是秒级 `updatedAt`。更新时不一致返回 `conflictError`（HTTP 409，`wireCode` 3），`currentCid` 是当前文件哈希，不会静默覆盖。匹配才写入。更新笔记、标签、集合、成员关系和条目上的标签时，调用 `persistItem`、`persistTag`、`persistCollection`、`addItemCollection`、`removeItemCollection`、`tagItem`、`untagItem` 之前会再读一次磁盘版本。版本已经变了就返回同一个 `conflictError`，不把旧快照写下去。这些函数进入之后、真正落盘之前仍会 await；要关上那段窗口需要改 afs。
 

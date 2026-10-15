@@ -139,7 +139,7 @@ node scripts/client.mjs read-attachment \
   --base http://HOST:PORT --credential-file FILE --id ITEM_ID --attachment ATTACHMENT_ID
 ```
 
-`list` 的 `--query` 会走搜索。有 `nextCursor` 就继续传 `--cursor`，不要假设一页就是全部。附件结果是 base64 字节和 `byteCount`，不是手机上的本地路径。
+`list` 的 `--query` 会走搜索。items 使用资料库索引。前缀是 `tag:`、`collection:`、`type:`、`link:` / `site:`、`after:` / `before:`、`status:archived`。默认排除已归档。空查询是空页。结果仍是 id、title、type、resourceVersion，没有正文。有 `nextCursor` 就继续传 `--cursor`，不要假设一页就是全部。附件结果是 base64 字节和 `byteCount`，不是手机上的本地路径。
 
 写完要再读一次，确认手机和这次返回是同一结果，然后再告诉用户成功。
 
