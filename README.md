@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  English | <a href="./README.zh.md">中文</a>
+  English | <a href="./README.zh.md">Chinese</a>
 </p>
 
 Hand the library already on your [Aside](https://github.com/ArcBlock/aside) iPhone to the agent you use on your computer. Search, take notes, tag, and file things into collections. What gets written stays in the library that is signed in on the phone.
@@ -21,7 +21,7 @@ Aside collects links, photos, files, and notes into items you can open, tag, and
 
 ## What you can do once connected
 
-In Claude Code, Cursor, Codex, Gemini CLI, or Grok, say “连接我的 Aside” (or “connect my Aside”). The agent finds the iPhone on the same Wi-Fi that has the connect page open, waits until you allow it on the phone, and then uses the **library that is signed in right now**.
+In Claude Code, Cursor, Codex, Gemini CLI, or Grok, say “connect my Aside.” The agent finds the iPhone on the same Wi-Fi that has the connect page open, waits until you allow it on the phone, and then uses the **library that is signed in right now**.
 
 **Save something onto the phone.** “Write down what we just discussed” creates a Quick Note. The body can be text. When this phone accepts rich notes, the note can also hold images, links, places, audio, files, and one short video. After writing, the agent reads the note back and checks that the phone and this write agree.
 
@@ -77,14 +77,14 @@ The computer side runs on macOS with Node.js 22. The phone is discovered with th
 
 ### 2. Open the connection on the iPhone
 
-Open Aside and tap **Connect an Agent** on the home screen (the link icon). The page title is 「等待连接」, and it tells you to say 「连接我的 Aside」 on the computer.
+Open Aside and tap **Connect an Agent** on the home screen (the link icon). The page waits for a computer and tells you to connect from the agent on your computer.
 
 The first time, the system may ask for local network permission. Allow it.
 
 You can leave this page after opening it. A short switch to another app keeps the connection. It stops, and you open the page again, when you:
 
 - lock the phone
-- tap 「结束连接」
+- tap End connection
 - stay away for about three minutes
 - switch library or account
 
@@ -92,13 +92,13 @@ The phone and the computer stay on the same Wi-Fi. While listening, the phone ke
 
 ### 3. Say one sentence on the computer
 
-> 连接我的 Aside
+> connect my Aside
 
 With one phone, the agent connects directly. With several, match the four-character mark at the bottom of the phone page. The page does not show an IP address or port.
 
 The agent sends the tool name, the computer name, and a six-digit pairing code into the chat. Check that same code on the phone and tap Allow. The code is good for about 60 seconds. Before you allow it, the agent cannot read bodies, attachments, tags, or collections.
 
-After that, the phone shows 「已连接」 and how many agent sessions are active.
+After that, the phone shows that it is connected, and how many agent sessions are active.
 
 ### 4. Ask for the work
 
@@ -108,11 +108,11 @@ After that, the phone shows 「已连接」 and how many agent sessions are acti
 - “Tag this note Travel.”
 - “Change only the second paragraph of this note and leave the other blocks.”
 
-About 15 minutes with no read or write, and this allow expires. Say 「连接我的 Aside」 again and allow it on the phone. Every connection asks for allow.
+About 15 minutes with no read or write, and this allow expires. Say “connect my Aside” again and allow it on the phone. Every connection asks for allow.
 
 ### 5. Finish
 
-Tap 「结束连接」 on the phone, or lock it. Notes, tags, and collections already written stay in the library.
+Tap End connection on the phone, or lock it. Notes, tags, and collections already written stay in the library.
 
 ## How your content is touched
 
