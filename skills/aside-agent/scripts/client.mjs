@@ -264,7 +264,7 @@ export class AsideAgentClient {
       req.on("error", (error) => {
         reject(new AsideAgentError({
           name: "AsideAgent.connection",
-          message: `连不上 ${this.base.hostname}:${this.base.port}。先用同一个地址再试一次。离开内容终端页，或短暂切到别的应用，不会断开。只有锁屏、离开大约三分钟，或点过结束连接，才需要重新打开页面。不要马上重新配对，也不要扫描局域网。`,
+          message: `连不上 ${this.base.hostname}:${this.base.port}。先用同一个地址再试一次。已有凭证时，先对这次浏览到的 base 做 probe，不要马上重新配对。端口每次监听打开都会变。离开内容终端页不会断开。锁屏或离开较久只是监听先停，授权还在，把手机带回前台即可。只有没有凭证、手机说 revoked，或用户拒绝，才重新配对。不要扫描局域网。`,
           secrets: this.secrets,
           error: { message: error.message },
         }));

@@ -68,6 +68,14 @@ test("skill text has no sample bearer or demo code", () => {
   assert.match(skill, /文件/);
   assert.match(skill, /视频/);
   assert.match(skill, /不接收天气/);
+  assert.match(skill, /已有凭证/);
+  assert.match(skill, /端口每次/);
+  assert.match(skill, /revoked/);
+  assert.match(skill, /denied|拒绝/);
+  assert.match(skill, /account/);
+  assert.match(skill, /断开/);
+  assert.doesNotMatch(skill, /15 分钟后过期/);
+  assert.doesNotMatch(skill, /锁屏后结束/);
   assert.doesNotMatch(skill, /也要确认/);
   assert.doesNotMatch(skill, /不要自己挑第一台就配对/);
 });

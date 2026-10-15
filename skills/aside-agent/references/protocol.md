@@ -12,13 +12,13 @@
 - 不导出 `/user`、`/dev`、`/kv`、`/afs`。装上内容投影之后，`POST /rpc` 只提供当前登录库：客户端的 `/` 对应手机 AFS 的 `/user`，返回路径去掉 `/user` 前缀。配对、领取和探针仍走 `/agent/v1`。`delete`、`rename`、`write` 不落盘。笔记、标签、集合、成员和待确认删除走 `exec /.actions/aside`。
 - 不恢复 `LocalAFSDebugHTTPServer`、`ensureDebugHTTPServer`、`startDebugHTTPServer`。
 - 发现载荷只在监听期间存在。它是以后 `_aside-agent._tcp` TXT 要逐字携带的连接元数据。`AsideAFSService` 使用的默认监听器绑定 IPv4 `INADDR_ANY`（`0.0.0.0`）的临时端口，发现载荷带 `port`，`transport` 为 `tcp`。测试可以注入不打开套接字的工厂，那种发现载荷没有 `port`，`transport` 为 `in-process`。
-- v1 是 cleartext TCP（明文，不实现 TLS）。监听期间手机会注册 Bonjour `_aside-agent._tcp`。电脑只浏览这一个服务类型。只有一台时直接连接，多台时由用户选中后再连接。不扫描网段，也不探测其它端口。页面只显示服务名，不显示 `host:port`。离开终端页不停止监听。短暂离开前台会保持同一条连接大约三分钟。锁屏、离开大约三分钟、结束连接、断网、资料库或账号切换会停止。Wi-Fi 不是信任。配对码和 Bearer 在过期或撤销之前，对同一局域网上的观察者可见。
+- v1 是 cleartext TCP（明文，不实现 TLS）。监听期间手机会注册 Bonjour `_aside-agent._tcp`。电脑只浏览这一个服务类型。只有一台时直接连接，多台时由用户选中后再连接。不扫描网段，也不探测其它端口。页面只显示服务名，不显示 `host:port`。离开终端页不停止监听。短暂离开前台大约三分钟内套接字保持。超过大约三分钟、锁屏或断网通知会先停套接字，授权还在，回到前台会重新打开。结束连接和确认断开会撤销。资料库或账号切换不停监听，也不撤销。Wi-Fi 不是信任。配对码和 Bearer 在撤销之前，对同一局域网上的观察者可见。
 - 尚未领取凭证的待配对会话最多 8 个。第 9 次 `pair` 返回 `pairing-limit`，并且不创建会话。
-- 每次新会话都要手机允许。没有「已信任设备」，凭证不落盘。没有请求就不会续期。
+- 每次新会话都要手机允许。没有「已信任设备」名单。已经允许的凭证放在钥匙串里，直到用户断开这一条、拒绝，或结束全部连接。杀掉进程之后，工具名、电脑名、最近一条状态和凭证都还在。没有时钟过期。
 - 配对码 60 秒、6 位、加密随机、单次使用。生产代码里没有固定演示码。允许之后连续 5 次错误即作废。
-- 会话凭证在 `claim` 成功时签发，32 字节、base64url。空闲 15 分钟后过期。成功的 probe、`/agent/v1/content` 或 `POST /rpc` 会把这 15 分钟重新算起。没有请求就不会续期，过期必须重新配对并再次允许。结束连接、离开前台大约三分钟、锁屏、断网通知、资料库或账号切换会撤销全部凭证并停止监听。只离开终端页，或在大约三分钟内回到前台，不会。监听开着时手机会保持屏幕常亮，避免离开页面后自动锁屏把连接关掉。同一台电脑、同一个工具再配对时，上一场还活着的会话会被收起，页面上只留新的这一条。另一台电脑或另一个工具仍是独立会话。
+- 会话凭证在 `claim` 成功时签发，32 字节、base64url。没有时钟过期，空闲再久仍然可以通过。结束全部连接、用户确认断开这一条、或拒绝会立刻撤销。锁屏、离开前台大约三分钟、断网通知只停套接字，不撤销，也不清空已保存的行。资料库或账号切换不停、不撤销。下一次 probe、capabilities、内容或 RPC 带上手机当前打开的账号：给人看的名字，加上 `HostDiskSession` 的 `stableID`。读写落在现在挂上的库。电脑不能另选账号。监听开着时手机会保持屏幕常亮。用户仍然可以锁屏；锁屏只停套接字。同一台电脑、同一个工具再配对时，上一场还活着的会话会被收起，页面上只留新的这一条。另一台电脑或另一个工具仍是独立会话。
 - 手机允许/拒绝只存在于服务 API。网络上的 `/agent/v1/allow` 固定拒绝。
-- 回到前台不会自动 `start()`。
+- 回到前台调用 `noteReturnedToForeground()`。还有已允许的凭证且监听已停时，这个方法自己重新 `start()`。服务的 `onAppForeground()` 不写 `.start(`。进程被杀掉之后同样如此，不需要新的配对码。
 - 错误复用 `AFSError`（`forbiddenError`、`conflictError`、`runtimeError`、`unsupported`、`notFound`、`validationError`）。线上整数复用 `AFSWireErrorCode`，不另造错误类型。
 
 ## 终端状态
@@ -27,15 +27,15 @@
 
 | 状态 | 行为 |
 | --- | --- |
-| `closed` | 初始。不监听，没有发现载荷，没有有效会话 |
+| `closed` | 初始。不监听，没有发现载荷。进程重启后已保存的授权还在，但要等监听重新打开才接受探针 |
 | `starting` | `start()` 已进入，绑定尚未完成。发现和探针都拒绝，不宣称就绪 |
 | `waiting` | 正在监听，没有有效授权会话。可以发现和配对 |
-| `active` | 至少一个有效授权会话。手机已允许、未断开、凭证未过期（尚未 `claim` 也算已授权）。凭证到期后即使没有探针，`state` 也会回到 `waiting` |
-| `ended` | `stopAll()`。全部凭证撤销，监听停止。必须再次 `start()` |
-| `interrupted` | 离开前台超过大约三分钟、锁屏、网络、资料库或账号切换。`interruptReason` 保留第一次原因。必须再次 `start()` |
+| `active` | 至少一个有效授权会话。手机已允许、未断开、凭证未撤销（尚未 `claim` 也算已授权）。没有时钟把 `state` 送回 `waiting` |
+| `ended` | `stopAll()`。全部凭证撤销，监听停止。必须再次 `start()` 并重新配对 |
+| `interrupted` | 离开前台超过大约三分钟、锁屏或网络。`interruptReason` 保留第一次原因。资料库或账号切换不会进入这里。授权还在。回到前台如果还有授权会重新打开监听 |
 | `failed` | 监听工厂抛错，例如本地网络权限被拒绝。`lastFailure` 是真实原因。再次 `start()` 即重试 |
 
-`noteReturnedToForeground()` 在宽限内只取消计时，不改变监听，也不调用监听工厂。宽限已过则按后台打断结束。两种情况都不调用 `start()`。`start()` 在 `waiting` 或 `active` 时不会重绑，避免换掉 `instanceId`。绑定完成前如果已经进入 `interrupted` / `ended`，返回的句柄会被 `stop`，监听不会留下来。
+`noteReturnedToForeground()` 在宽限内只取消计时，不改变监听。宽限已过则先按后台暂停套接字，不撤销。然后如果状态不是 `ended`、监听已停、并且还有已允许的凭证，就调用 `start()`。`start()` 在 `waiting` 或 `active` 且已经在听时不会重绑，避免换掉 `instanceId`。绑定完成前如果已经进入 `interrupted` / `ended`，返回的句柄会被 `stop`，监听不会留下来。
 
 ## 会话
 
@@ -104,12 +104,11 @@
   "ok": true,
   "sessionId": "6f0c1d2e-3a4b-5c6d-7e8f-901234567890",
   "credential": "base64url-32-bytes",
-  "expiresAt": "2026-10-13T05:16:00Z",
   "scope": ["aside.agent.probe"]
 }
 ```
 
-允许之前的 `claim` 一律是 `not-allowed`，不透露码对不对，也不消耗尝试次数。码过期是 `pairing-expired`。允许后的错误码是 `pairing-invalid`；第五次错误或成功后再用是 `pairing-used`。拒绝后是 `denied`。
+允许之前的 `claim` 一律是 `not-allowed`，不透露码对不对，也不消耗尝试次数。码过期是 `pairing-expired`。允许后的错误码是 `pairing-invalid`；第五次错误或成功后再用是 `pairing-used`。拒绝后是 `denied`。`claim` 成功体没有 `expiresAt`。凭证没有时钟过期。
 
 ## 探针
 
@@ -121,11 +120,15 @@
   "sessionId": "6f0c1d2e-3a4b-5c6d-7e8f-901234567890",
   "scope": ["aside.agent.probe"],
   "protocol": "aside-agent",
-  "version": 1
+  "version": 1,
+  "account": {
+    "name": "本机",
+    "id": "local"
+  }
 }
 ```
 
-成功体只有这五个键，不含凭证和收藏。未授权、过期、已撤销都会拒绝；一个新签发的凭证可以通过。撤销 A 不影响 B。全部停止或打断之后，新请求先得到「监听未接受」；再次 `start()` 之后，旧凭证仍是 `revoked`，新的允许会话可以通过。
+成功体是这六个键。`account.name` 是手机当前打开账号的显示名，`account.id` 是 `HostDiskSession` 当前磁盘的 `stableID`。客户端送来的账号字段会被忽略。不含凭证和收藏。未授权或已撤销会拒绝。空闲再久仍然可以通过，因为这份凭证没有时钟过期。撤销 A 不影响 B。`stopAll()` 之后，新请求先得到「监听未接受」；再次 `start()` 之后，被撤销的旧凭证仍是 `revoked`，新的允许会话可以通过。只暂停套接字（锁屏、离开较久、断网）不撤销；监听重新打开后，同一份凭证可以通过。
 
 ## 错误
 
@@ -146,7 +149,7 @@ HTTP 体：
 | 情况 | HTTP | `AFSError` | `reason` 或说明 | `wireCode` |
 | --- | --- | --- | --- | --- |
 | 缺少或未知凭证 | 401 | `forbiddenError` | `unauthorized` | 6 `unauthorized` |
-| 凭证过期 | 403 | `forbiddenError` | `expired` | 6 |
+| 凭证没有时钟过期 | — | — | 空闲再久仍可通过。`expired` 留给删除确认超时，不用于这份凭证 | — |
 | 会话已撤销 | 403 | `forbiddenError` | `revoked` | 6 |
 | 尚未允许 | 403 | `forbiddenError` | `not-allowed` | 6 |
 | 配对码错误 | 403 | `forbiddenError` | `pairing-invalid` | 6 |
@@ -184,9 +187,9 @@ HTTP 体：
 
 ## 内容
 
-`POST /agent/v1/content` 仍在。凭证与探针相同：缺少 Bearer 是 HTTP 401 `forbiddenError` / `unauthorized`；撤销或过期是 HTTP 403，`reason` 为 `revoked` 或 `expired`。未安装挂载仍是 HTTP 501 `aside.agent.content`。`/user`、`/dev`、`/kv`、`/afs` 仍是 HTTP 501 `aside.agent.export`。发现载荷仍只有上一节的连接键。
+`POST /agent/v1/content` 仍在。凭证与探针相同：缺少 Bearer 是 HTTP 401 `forbiddenError` / `unauthorized`；撤销是 HTTP 403，`reason` 为 `revoked`。没有时钟过期。成功的内容 JSON 带 `account`（`name` 与 `id`）。未安装挂载仍是 HTTP 501 `aside.agent.content`。`/user`、`/dev`、`/kv`、`/afs` 仍是 HTTP 501 `aside.agent.export`。发现载荷仍只有上一节的连接键。
 
-装上内容投影后，同一条监听另答 `POST /rpc`。这是 AFS HTTP RPC：正文 `{ method, args }`，`args` 是数组。成功是 `{ success: true, data }`。失败是 `{ success: false, error: { code, message } }`，`code` 用 CLI 的 1 找不到、2 拒绝、3 冲突、5 运行时、6 未授权。缺少 Bearer 是 HTTP 401，`reason` 为 `unauthorized`。撤销或过期是 HTTP 403，`reason` 为 `revoked` 或 `expired`。未安装投影时 `POST /rpc` 仍是 HTTP 501 `aside.agent.export`。进程内同步 `accept` 不打开 `/rpc`，TCP 监听走 `respond`。
+装上内容投影后，同一条监听另答 `POST /rpc`。这是 AFS HTTP RPC：正文 `{ method, args }`，`args` 是数组。成功是 `{ success: true, data }`。失败是 `{ success: false, error: { code, message } }`，`code` 用 CLI 的 1 找不到、2 拒绝、3 冲突、5 运行时、6 未授权。缺少 Bearer 是 HTTP 401，`reason` 为 `unauthorized`。撤销是 HTTP 403，`reason` 为 `revoked`。没有时钟过期。HTTP 200 的成功体也带上外层 `account`。未安装投影时 `POST /rpc` 仍是 HTTP 501 `aside.agent.export`。进程内同步 `accept` 不打开 `/rpc`，TCP 监听走 `respond`。
 
 客户端路径 `/` 映射到手机 `/user`，`/items/...` 映射到 `/user/items/...`。返回条目的路径去掉 `/user`。`..`、`/dev`、`/kv`、`/afs`，以及会再套一层的 `/user`，都拒绝，且不返回库正文。`list`、`read`、`stat`、`search`、`explain` 读这个库。`delete`、`rename`、`write` 返回拒绝，不删除、不改文件。`exec /.actions/aside` 把参数交给上面的内容动作，所以删除仍只登记手机确认。`GET /rpc` 和其他路径不提供订阅，也不导出整棵树。没有第二条 HTTP 服务。
 
@@ -242,11 +245,11 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 `AsideAFSService` 持有会话门：
 
 - `onAppBackground()` → `beginBackgroundGrace()`，并 `beginBackgroundTask(withName: "aside-agent-listener")`。系统到期回调只结束这个任务，不撤销凭证
-- `onAppForeground()` → 先结束上述任务，再 `noteReturnedToForeground()`，不调用 `start()`
-- 宽限是 `AgentLANContract.backgroundGrace`，180 秒。再次进入后台不会把还没结束的宽限往后推。锁屏、结束、断网、资料库或账号切换会取消宽限，避免稍后的计时改写 `interruptReason`
-- 资料库目录真正变化之前 → `stopForLibrarySwitch()`
-- `stopAgentSessionsForScreenLock()`：`AsideApp` 在 `protectedDataWillBecomeUnavailableNotification` 时调用。短暂 `inactive`（例如权限弹窗）不停止
-- `stopAgentSessionsForAccountSwitch()`：`HostDiskSession` 在切换磁盘和登出时调用
+- `onAppForeground()` → 先结束上述任务，再 `noteReturnedToForeground()`。这个方法在还有授权且监听已停时自己重新打开。服务里不写 `.start(`
+- 宽限是 `AgentLANContract.backgroundGrace`，180 秒。再次进入后台不会把还没结束的宽限往后推。锁屏、结束、断网会取消宽限。资料库或账号切换不取消授权，也不改 `interruptReason`
+- 资料库目录真正变化之前 → `stopForLibrarySwitch()`。这个调用不停监听、不撤销。下一次响应使用现在挂上的库和当前账号
+- `stopAgentSessionsForScreenLock()`：`AsideApp` 在 `protectedDataWillBecomeUnavailableNotification` 时调用。它暂停套接字，不撤销。短暂 `inactive`（例如权限弹窗）不停止
+- `stopAgentSessionsForAccountSwitch()`：`HostDiskSession` 在切换磁盘和登出时调用。它不停监听、不撤销。下一次响应使用切换后的账号
 
 #2286 通过 `AsideAFSService` 调用，不直接碰会话门：
 
@@ -256,4 +259,4 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 - `agentSessionEvents` / `agentSessionState` 是当前事件和终端状态
 - `confirmAgentDelete` / `cancelAgentDelete` 只在进程内结束删除确认。服务初始化时安装内容挂载，不调用 `start()`
 
-回到前台只调用 `noteReturnedToForeground()`，不调用 `startAgentSessions()`。离开终端页不调用 `stopAll()`。最后一个有效会话撤销后回到 `waiting`，监听保持，直到用户结束、锁屏、离开大约三分钟，或宿主打断。
+回到前台只调用 `noteReturnedToForeground()`，不在服务里调用 `startAgentSessions()`。那个方法自己在还有授权时重新打开监听。离开终端页不调用 `stopAll()`。最后一个有效会话撤销后回到 `waiting`，监听保持，直到用户结束连接或确认断开。锁屏或离开大约三分钟只暂停套接字。
