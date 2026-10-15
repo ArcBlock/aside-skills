@@ -16,7 +16,7 @@
 - 尚未领取凭证的待配对会话最多 8 个。第 9 次 `pair` 返回 `pairing-limit`，并且不创建会话。
 - 每次新会话都要手机允许。没有「已信任设备」名单。已经允许的凭证放在钥匙串里，直到用户断开这一条、拒绝，或结束全部连接。杀掉进程之后，工具名、电脑名、最近一条状态和凭证都还在。没有时钟过期。
 - 配对码 60 秒、6 位、加密随机、单次使用。生产代码里没有固定演示码。允许之后连续 5 次错误即作废。
-- 会话凭证在 `claim` 成功时签发，32 字节、base64url。没有时钟过期，空闲再久仍然可以通过。结束全部连接、用户确认断开这一条、或拒绝会立刻撤销。锁屏、离开前台大约三分钟、断网通知只停套接字，不撤销，也不清空已保存的行。资料库或账号切换不停、不撤销。下一次 probe、capabilities、内容或 RPC 带上手机当前打开的账号：给人看的名字，加上 `HostDiskSession` 的 `stableID`。读写落在现在挂上的库。电脑不能另选账号。监听开着时手机会保持屏幕常亮。用户仍然可以锁屏；锁屏只停套接字。同一台电脑、同一个工具再配对时，上一场还活着的会话会被收起，页面上只留新的这一条。另一台电脑或另一个工具仍是独立会话。
+- 会话凭证在 `claim` 成功时签发，32 字节、base64url。没有时钟过期，空闲再久仍然可以通过。结束全部连接、用户确认断开这一条、或拒绝会立刻撤销。锁屏、离开前台大约三分钟、断网通知只停套接字，不撤销，也不清空已保存的行。资料库或账号切换不停、不撤销。挂上的目录还不是当前磁盘时，内容和 RPC 返回 `library-changing`（不是 `revoked`，也不是 `expired`），不读不写上一份库，也不把新账号盖到旧数据上。同一份凭证的 probe 仍然通过。目录对齐之后，probe、capabilities、内容或 RPC 带上手机当前打开的账号：给人看的名字，加上 `HostDiskSession` 的 `stableID`。读写落在现在挂上的库。电脑不能另选账号。监听开着时手机会保持屏幕常亮。用户仍然可以锁屏；锁屏只停套接字。同一台电脑、同一个工具再配对时，上一场还活着的会话会被收起，页面上只留新的这一条。另一台电脑或另一个工具仍是独立会话。
 - 手机允许/拒绝只存在于服务 API。网络上的 `/agent/v1/allow` 固定拒绝。
 - 回到前台调用 `noteReturnedToForeground()`。还有已允许的凭证且监听已停时，这个方法自己重新 `start()`。服务的 `onAppForeground()` 不写 `.start(`。进程被杀掉之后同样如此，不需要新的配对码。
 - 错误复用 `AFSError`（`forbiddenError`、`conflictError`、`runtimeError`、`unsupported`、`notFound`、`validationError`）。线上整数复用 `AFSWireErrorCode`，不另造错误类型。
@@ -187,9 +187,9 @@ HTTP 体：
 
 ## 内容
 
-`POST /agent/v1/content` 仍在。凭证与探针相同：缺少 Bearer 是 HTTP 401 `forbiddenError` / `unauthorized`；撤销是 HTTP 403，`reason` 为 `revoked`。没有时钟过期。成功的内容 JSON 带 `account`（`name` 与 `id`）。未安装挂载仍是 HTTP 501 `aside.agent.content`。`/user`、`/dev`、`/kv`、`/afs` 仍是 HTTP 501 `aside.agent.export`。发现载荷仍只有上一节的连接键。
+`POST /agent/v1/content` 仍在。凭证与探针相同：缺少 Bearer 是 HTTP 401 `forbiddenError` / `unauthorized`；撤销是 HTTP 403，`reason` 为 `revoked`。没有时钟过期。挂上的目录还不是当前磁盘时是 HTTP 403，`reason` 为 `library-changing`，正文不含上一份库，也不盖上新账号。成功的内容 JSON 带 `account`（`name` 与 `id`）。未安装挂载仍是 HTTP 501 `aside.agent.content`。`/user`、`/dev`、`/kv`、`/afs` 仍是 HTTP 501 `aside.agent.export`。发现载荷仍只有上一节的连接键。
 
-装上内容投影后，同一条监听另答 `POST /rpc`。这是 AFS HTTP RPC：正文 `{ method, args }`，`args` 是数组。成功是 `{ success: true, data }`。失败是 `{ success: false, error: { code, message } }`，`code` 用 CLI 的 1 找不到、2 拒绝、3 冲突、5 运行时、6 未授权。缺少 Bearer 是 HTTP 401，`reason` 为 `unauthorized`。撤销是 HTTP 403，`reason` 为 `revoked`。没有时钟过期。HTTP 200 的成功体也带上外层 `account`。未安装投影时 `POST /rpc` 仍是 HTTP 501 `aside.agent.export`。进程内同步 `accept` 不打开 `/rpc`，TCP 监听走 `respond`。
+装上内容投影后，同一条监听另答 `POST /rpc`。这是 AFS HTTP RPC：正文 `{ method, args }`，`args` 是数组。成功是 `{ success: true, data }`。失败是 `{ success: false, error: { code, message } }`，`code` 用 CLI 的 1 找不到、2 拒绝、3 冲突、5 运行时、6 未授权。缺少 Bearer 是 HTTP 401，`reason` 为 `unauthorized`。撤销是 HTTP 403，`reason` 为 `revoked`。没有时钟过期。挂上的目录还不是当前磁盘时是 HTTP 403，`reason` 为 `library-changing`，不是 HTTP 200，因此不会盖上 `account`。HTTP 200 的成功体也带上外层 `account`。未安装投影时 `POST /rpc` 仍是 HTTP 501 `aside.agent.export`。进程内同步 `accept` 不打开 `/rpc`，TCP 监听走 `respond`。
 
 客户端路径 `/` 映射到手机 `/user`，`/items/...` 映射到 `/user/items/...`。返回条目的路径去掉 `/user`。`..`、`/dev`、`/kv`、`/afs`，以及会再套一层的 `/user`，都拒绝，且不返回库正文。`list`、`read`、`stat`、`search`、`explain` 读这个库。`delete`、`rename`、`write` 返回拒绝，不删除、不改文件。`exec /.actions/aside` 把参数交给上面的内容动作，所以删除仍只登记手机确认。`GET /rpc` 和其他路径不提供订阅，也不导出整棵树。没有第二条 HTTP 服务。
 
@@ -247,9 +247,9 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 - `onAppBackground()` → `beginBackgroundGrace()`，并 `beginBackgroundTask(withName: "aside-agent-listener")`。系统到期回调只结束这个任务，不撤销凭证
 - `onAppForeground()` → 先结束上述任务，再 `noteReturnedToForeground()`。这个方法在还有授权且监听已停时自己重新打开。服务里不写 `.start(`
 - 宽限是 `AgentLANContract.backgroundGrace`，180 秒。再次进入后台不会把还没结束的宽限往后推。锁屏、结束、断网会取消宽限。资料库或账号切换不取消授权，也不改 `interruptReason`
-- 资料库目录真正变化之前 → `stopForLibrarySwitch()`。这个调用不停监听、不撤销。下一次响应使用现在挂上的库和当前账号
+- 资料库目录真正变化之前 → `stopForLibrarySwitch()`。这个调用不停监听、不撤销。目录还没对齐时内容和 RPC 是 `library-changing`。对齐之后，下一次响应使用现在挂上的库和当前账号
 - `stopAgentSessionsForScreenLock()`：`AsideApp` 在 `protectedDataWillBecomeUnavailableNotification` 时调用。它暂停套接字，不撤销。短暂 `inactive`（例如权限弹窗）不停止
-- `stopAgentSessionsForAccountSwitch()`：`HostDiskSession` 在切换磁盘和登出时调用。它不停监听、不撤销。下一次响应使用切换后的账号
+- `stopAgentSessionsForAccountSwitch()`：`HostDiskSession` 在切换磁盘和登出时调用。它不停监听、不撤销。目录还没换成当前磁盘时内容和 RPC 是 `library-changing`。对齐之后，下一次响应使用切换后的账号
 
 #2286 通过 `AsideAFSService` 调用，不直接碰会话门：
 
