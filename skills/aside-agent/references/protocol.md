@@ -193,7 +193,7 @@ HTTP 体：
 
 客户端路径 `/` 映射到手机 `/user`，`/items/...` 映射到 `/user/items/...`。返回条目的路径去掉 `/user`。`..`、`/dev`、`/kv`、`/afs`，以及会再套一层的 `/user`，都拒绝，且不返回库正文。`list`、`read`、`stat`、`search`、`explain` 读这个库。`delete`、`rename`、`write` 返回拒绝，不删除、不改文件。`exec /.actions/aside` 把参数交给上面的内容动作，所以删除仍只登记手机确认。`GET /rpc` 和其他路径不提供订阅，也不导出整棵树。没有第二条 HTTP 服务。
 
-电脑 skill 不另写 HTTP 客户端。配对、领取和探针仍走 `/agent/v1`。库挂到 `/aside` 之后，条目搜索是 `arc afs search /aside/items`（或 `/aside`），也就是这里的 RPC `search`。`/items` 与库根走 #2369 的资料库索引；调用方没给 limit 时最多 500 条，偏移固定为 0，没有游标。空查询是空页。写操作是 `arc afs exec /aside/.actions/aside`。不要调用 `/.actions/query`。
+电脑 skill 不另写 HTTP 客户端。配对、领取和探针仍走 `/agent/v1`。库挂到 `/aside` 之后，条目搜索是 `arc afs search /aside/items`（或 `/aside`），也就是这里的 RPC `search`。`/items` 与库根走 #2369 的资料库索引。没给 `limit` 时一页 500 条。传入的 `limit` 钳在 1...500，`0` 会变成 1。`cursor` 是十进制非负偏移，缺省从 0 开始；空字符串也是 0。还有下一页时成功体带 `meta`：`cursor` 是下一页偏移，`hasMore` 为 true。已经走完时不带 `meta`。越过末尾是空的 `data`，不是校验错误。`abc`、负数、带小数的 cursor 是 `invalid agent request`（HTTP 200，`code` 5）。空查询也先校验 cursor。集合和标签不是这份索引，没有这个 cursor。空查询是空页。电脑上翻页是 `arc afs search <path> <query> --limit <n> --cursor <meta.cursor> --json`。两个参数都不传时，请求与以前相同。`arc afs search` 聚合后的 JSON 带 `meta`，不带手机 RPC 体上的 `total`。写操作是 `arc afs exec /aside/.actions/aside`。不要调用 `/.actions/query`。
 
 v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发现对象，不追加密钥。监听仍是 IPv4 `INADDR_ANY`，待配对上限仍是 8。本接口会把条目正文和附件字节放进响应。凭证有效的那段时间里，同一局域网上的观察者可以读到这些字节。这是残留，不是另开一条加密通道。监听线程等待响应，写入在主演员上 await 既有库函数。没有第二条 HTTP 服务。
 
@@ -219,7 +219,7 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 | `batch` | 逐项执行上面的非删除写操作 | 同上 |
 | `confirm`、`confirmDelete` | 网络上不能确认 | 返回 `aside.agent.allow` |
 
-`cursor` 是十进制偏移，缺省从 0 开始。`limit` 缺省 50，钳在 1...100。不带 query 的 list 仍按 id 排序。items 的搜索顺序是索引顺序：精确 URL，精确标题，标题前缀，然后 bm25，然后 createdAt 降序。`nextCursor` 在还有剩余时给出。走完每一页不会漏。空库合法。列表项只有 `id`、`title`、`type`、`resourceVersion`。
+`cursor` 是十进制偏移，缺省从 0 开始。`limit` 缺省 50，钳在 1...100。不带 query 的 list 仍按 id 排序。items 的搜索顺序是索引顺序：精确 URL，精确标题，标题前缀，然后 bm25，然后 createdAt 降序。`nextCursor` 在还有剩余时给出。走完每一页不会漏。空库合法。列表项只有 `id`、`title`、`type`、`resourceVersion`。这组 `cursor`、`nextCursor` 和 1...100 的 `limit` 只属于 `arc afs exec` 的 `list` / `search`。`arc afs search` 用的是上一节的 RPC `meta.cursor`，一页最多 500。
 
 `resourceVersion` 是该 JSON 文件字节的 SHA-256 十六进制。它不是 schema `version`，也不是秒级 `updatedAt`。更新时不一致返回 `conflictError`（HTTP 409，`wireCode` 3），`currentCid` 是当前文件哈希，不会静默覆盖。匹配才写入。更新笔记、标签、集合、成员关系和条目上的标签时，调用 `persistItem`、`persistTag`、`persistCollection`、`addItemCollection`、`removeItemCollection`、`tagItem`、`untagItem` 之前会再读一次磁盘版本。版本已经变了就返回同一个 `conflictError`，不把旧快照写下去。这些函数进入之后、真正落盘之前仍会 await；要关上那段窗口需要改 afs。
 
