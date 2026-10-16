@@ -29,7 +29,7 @@ In Claude Code, Cursor, Codex, Gemini CLI, or Grok, say “connect my Aside.” 
 
 **Organize in place.** “Make a Reading list and put these in it” or “tag this one Travel.” Tags, collections, and membership are written back to the same library. An edit to an existing note carries the version just read, so a newer edit you made on the phone is left as it is.
 
-**Let file tools on the computer see the same library.** After pairing, the library can be mounted at `/aside`. `arc afs list /aside` shows items, collections, and tags. If [arc](https://arc.afsd.io) is missing, the client prints the install command. Search, notes, and organizing still go through this skill when the mount is unavailable.
+**Search and organize that same library from the computer.** After pairing, the library is mounted at `/aside`. Search uses `arc afs search` and the phone's library index: keywords, Chinese text, tags, collections, types, links, and dates. Reading, notes, tags, and collections also go through `arc afs`. If [arc](https://arc.afsd.io) is missing, install it first.
 
 Several computers and several agents can be connected at once. The phone shows which tool, which computer, and what it is doing. You can disconnect one session. Changes already saved stay.
 
@@ -62,7 +62,7 @@ Or tell your agent:
 <details>
 <summary><b>Copy the skill directory</b></summary>
 
-Copy the whole `skills/aside-agent` directory. Keep `SKILL.md`, `scripts/`, and `references/` together. The instructions alone are not enough.
+Copy the whole `skills/aside-agent` directory. Keep `SKILL.md` and `references/` together.
 
 | Agent | Destination |
 | --- | --- |
@@ -71,7 +71,7 @@ Copy the whole `skills/aside-agent` directory. Keep `SKILL.md`, `scripts/`, and 
 | Cursor | `~/.cursor/skills/aside-agent` or `.cursor/skills/aside-agent` in a project |
 | Grok | `~/.grok/skills/aside-agent` |
 
-The computer side runs on macOS with Node.js 22. The phone is discovered with the system Bonjour browser.
+The computer side runs on macOS. The phone is discovered with the system Bonjour browser. Reading and writing the library uses [arc](https://arc.afsd.io).
 
 </details>
 
@@ -81,14 +81,9 @@ Open Aside and tap **Connect an Agent** on the home screen (the link icon). The 
 
 The first time, the system may ask for local network permission. Allow it.
 
-You can leave this page after opening it. A short switch to another app keeps the connection. It stops, and you open the page again, when you:
+You can leave this page after opening it. Switching apps, locking the phone, or leaving it for a while keeps an allow that was already granted. The listener stops first. Bringing Aside back to the foreground opens it again, without a new pairing. Tapping End connection, or disconnecting one session, cancels that grant. Switching library or account does not.
 
-- lock the phone
-- tap End connection
-- stay away for about three minutes
-- switch library or account
-
-The phone and the computer stay on the same Wi-Fi. While listening, the phone keeps the screen awake so auto-lock does not drop the connection. You can still lock it yourself. Locking stops the connection.
+The phone and the computer stay on the same Wi-Fi.
 
 ### 3. Say one sentence on the computer
 
@@ -108,11 +103,11 @@ After that, the phone shows that it is connected, and how many agent sessions ar
 - “Tag this note Travel.”
 - “Change only the second paragraph of this note and leave the other blocks.”
 
-About 15 minutes with no read or write, and this allow expires. Say “connect my Aside” again and allow it on the phone. Every connection asks for allow.
+This allow has no clock expiry. The same grant keeps working until you disconnect that session on the phone. A new computer or a new agent still needs its own allow.
 
 ### 5. Finish
 
-Tap End connection on the phone, or lock it. Notes, tags, and collections already written stay in the library.
+Tap End connection on the phone. Notes, tags, and collections already written stay in the library. Locking the phone does not cancel the grant.
 
 ## How your content is touched
 
@@ -136,13 +131,7 @@ When the phone advertises the capability, a Quick Note can hold text, images, li
 
 The iOS app, the connect page, and the engineering protocol live in [ArcBlock/aside](https://github.com/ArcBlock/aside). This repository is how a computer agent connects and reads or writes. Change phone behavior in Aside first, then in this skill.
 
-The client has no npm dependencies. From this repository, with Node.js 22:
-
-```bash
-node --test skills/aside-agent/scripts/client.test.mjs
-```
-
-That suite checks the client and the skill text. It does not build the iOS app. The suite that talks to a real foreground listener stays in the Aside repository at `design/aside-agent-mode/skill/`.
+This repository no longer ships a computer-side client. Library operations are `arc afs` commands. The suite that talks to a real foreground listener stays in the Aside repository at `design/aside-agent-mode/skill/`.
 
 `skills/aside-agent/references/protocol.md` is the copy an agent reads. The engineering source is `design/aside-agent-mode/PROTOCOL.md` in the Aside repository. The two copies can drift. A connected phone's `capabilities` response is what that phone accepts.
 

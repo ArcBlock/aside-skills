@@ -6,12 +6,12 @@
   },
   "metadata": {
     "description": "Agent Skills for Aside. Connect a computer agent to an Aside phone on the same LAN and organize the current library.",
-    "version": "0.1.2"
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "aside",
-      "description": "Connect to an Aside phone, mount the current library, and organize items from a computer agent.",
+      "description": "Connect to an Aside phone, mount the current library at /aside, and use arc afs to search and organize it.",
       "source": "./",
       "strict": false,
       "skills": [

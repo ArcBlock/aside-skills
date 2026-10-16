@@ -29,7 +29,7 @@ Aside 用来随手把链接、图片、文件和想法收成一条条可以打�
 
 **就地整理。** 「建一个『待读』集合，把这几条放进去」「给这篇加上『旅行』」。标签、集合和成员关系写回同一份库。改已有笔记时带着刚读到的版本，避免盖掉你在手机上刚做的修改。
 
-**让电脑上的文件工具看见同一份库。** 配对之后可以把资料库挂到 `/aside`，用 `arc afs list /aside` 看到条目、集合和标签。电脑上还没有 [arc](https://arc.afsd.io) 时，客户端会给出安装命令。挂不上时，查找、笔记和整理仍然走这个 skill。
+**在电脑上搜索和整理同一份库。** 配对之后，资料库挂在 `/aside`。查找用 `arc afs search`，走的是手机上那份资料库索引：关键字、中文、标签、集合、类型、链接和日期。阅读、笔记、标签和集合也走 `arc afs`。电脑上还没有 [arc](https://arc.afsd.io) 时，先安装它。
 
 几台电脑、几个 Agent 可以同时连着。手机上能看到是哪一个工具、哪一台设备、正在做什么。点某一条可以单独断开。已经保存的改动会留下。
 
@@ -62,7 +62,7 @@ npx skills add ArcBlock/aside-skills
 <details>
 <summary><b>手动复制</b></summary>
 
-复制整个 `skills/aside-agent`。`SKILL.md`、`scripts/` 和 `references/` 要在一起，只复制说明文件不够。
+复制整个 `skills/aside-agent`。`SKILL.md` 和 `references/` 要在一起。
 
 | Agent | 位置 |
 | --- | --- |
@@ -71,7 +71,7 @@ npx skills add ArcBlock/aside-skills
 | Cursor | `~/.cursor/skills/aside-agent` 或项目里的 `.cursor/skills/aside-agent` |
 | Grok | `~/.grok/skills/aside-agent` |
 
-电脑侧目前在 macOS 上使用，需要 Node.js 22。发现手机用系统自带的 Bonjour。
+电脑侧在 macOS 上使用。发现手机用系统自带的 Bonjour。读写资料库用 [arc](https://arc.afsd.io)。
 
 </details>
 
@@ -81,14 +81,9 @@ npx skills add ArcBlock/aside-skills
 
 第一次打开时，系统可能询问本地网络权限，需要允许。
 
-打开之后可以离开这一页，短暂切到别的 App 也会保持。下面几种情况会停掉，需要再进一次这个页面：
+打开之后可以离开这一页。切到别的 App、锁屏或离开较久，已经允许的授权还会留着。监听会先停，把 Aside 唤醒到前台后会自己重新打开，不用重新配对。点「结束连接」或断开某一条，才会取消那一份授权。切换资料库或账号不会取消授权。
 
-- 锁屏
-- 点「结束连接」
-- 离开大约三分钟
-- 切换资料库或账号
-
-手机和电脑连同一个 Wi-Fi。监听开着时，手机会保持屏幕常亮，避免自动锁屏把连接关掉。你仍可以自己锁屏，锁屏后连接停止。
+手机和电脑连同一个 Wi-Fi。
 
 ### 3. 在电脑上说一句
 
@@ -108,11 +103,11 @@ Agent 会把工具名、电脑名和六位配对码发到对话里。在手机�
 - 「给这篇笔记加上标签『旅行』」
 - 「这篇笔记只改第二段，其他块留着」
 
-大约 15 分钟没有任何读写，这次允许会过期。下次再说「连接我的 Aside」，在手机上重新点允许。每次连接都要允许。
+这次允许没有时钟过期。你在手机上断开这一条之前，同一份授权还能用。新的电脑或新的 Agent 仍要再点一次允许。
 
 ### 5. 结束
 
-在手机上点「结束连接」，或直接锁屏。已经写入的笔记、标签和集合留在资料库里。
+在手机上点「结束连接」。已经写入的笔记、标签和集合留在资料库里。锁屏不会取消这次授权。
 
 ## 内容会怎么被碰到
 
@@ -136,13 +131,7 @@ Quick Note 在手机公布了相应能力时，可以包含文字、图片、链
 
 iOS 应用、内容终端和工程协议在 [ArcBlock/aside](https://github.com/ArcBlock/aside)。这里只维护电脑上的 Agent 怎么连、怎么读写。手机行为先改 Aside，再改这里的 skill。
 
-客户端不需要 npm install。在本仓库用 Node.js 22 运行：
-
-```bash
-node --test skills/aside-agent/scripts/client.test.mjs
-```
-
-这一份测试检查客户端和 skill 文本，不编译 iOS 应用。对着真实前台监听的套件在 Aside 仓库的 `design/aside-agent-mode/skill/`。
+这个仓库不再带电脑端客户端。库操作是 `arc afs`。对着真实前台监听的套件在 Aside 仓库的 `design/aside-agent-mode/skill/`。
 
 `skills/aside-agent/references/protocol.md` 是给 Agent 读的协议副本。工程原文是 Aside 仓库里的 `design/aside-agent-mode/PROTOCOL.md`。两边可以不一致。某台手机接受什么，以它连接后返回的 `capabilities` 为准。
 

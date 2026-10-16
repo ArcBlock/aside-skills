@@ -193,6 +193,8 @@ HTTP 体：
 
 客户端路径 `/` 映射到手机 `/user`，`/items/...` 映射到 `/user/items/...`。返回条目的路径去掉 `/user`。`..`、`/dev`、`/kv`、`/afs`，以及会再套一层的 `/user`，都拒绝，且不返回库正文。`list`、`read`、`stat`、`search`、`explain` 读这个库。`delete`、`rename`、`write` 返回拒绝，不删除、不改文件。`exec /.actions/aside` 把参数交给上面的内容动作，所以删除仍只登记手机确认。`GET /rpc` 和其他路径不提供订阅，也不导出整棵树。没有第二条 HTTP 服务。
 
+电脑 skill 不另写 HTTP 客户端。配对、领取和探针仍走 `/agent/v1`。库挂到 `/aside` 之后，条目搜索是 `arc afs search /aside/items`（或 `/aside`），也就是这里的 RPC `search`。`/items` 与库根走 #2369 的资料库索引；调用方没给 limit 时最多 500 条，偏移固定为 0，没有游标。空查询是空页。写操作是 `arc afs exec /aside/.actions/aside`。不要调用 `/.actions/query`。
+
 v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发现对象，不追加密钥。监听仍是 IPv4 `INADDR_ANY`，待配对上限仍是 8。本接口会把条目正文和附件字节放进响应。凭证有效的那段时间里，同一局域网上的观察者可以读到这些字节。这是残留，不是另开一条加密通道。监听线程等待响应，写入在主演员上 await 既有库函数。没有第二条 HTTP 服务。
 
 `AsideAFSService` 在 `self` 存在后安装一次。挂载闭包指向当前的 `userSpaceFolder` 和已经挂上的 `afs`，也就是应用正在用的 `/user` 库。安装本身不调用 `start()`。
