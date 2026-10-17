@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.3.0"
+  version: "0.3.1"
 ---
 
 # Aside 电脑 Skill
@@ -131,21 +131,21 @@ cd ~/.aside-agent && arc afs search /aside/items "论文 tag:papers after:2026-0
 
 `/aside` 和 `/aside/items` 都会打到这份索引。别的路径不是这份索引。集合和标签用 `arc afs ls`，不要用前缀语言去搜它们。
 
-前缀大小写不敏感。没有前缀的词彼此 AND。空查询或纯空白是空页，不会返回最近条目。要看目录用 `ls`。只有前缀、没有关键字（例如 `tag:papers`、`type:link`）会查索引。默认排除已归档。`arc afs search` 要带 `--json`。不传 `--limit` 时这一页最多 500 条。`--limit` 是正整数；这台手机只用 1 到 500，再大也会被收成 500。`meta.hasMore` 为 true 时才带 `--cursor`，值就是这一页的 `meta.cursor`。没有 `meta`，或 `hasMore` 不是 true，就停，不要自己编 cursor。`arc afs search --help` 里没有 `--cursor` 时，先升级 arc，不要改去自己 POST `/rpc`。响应正好 500 条且没有 `meta` 时，这台手机还没有搜索翻页，不要把这一页当成全部。集合和标签不走这个 cursor。`arc afs exec` 的 `list` / `search` 用另一套 `nextCursor`，默认 50、最多 100。
+前缀大小写不敏感。没有前缀的词彼此 AND。空查询或纯空白是空页，不会返回最近条目。要看目录用 `ls`。只有前缀、没有关键字（例如 `tag:papers`、`type:link`）会查索引。默认排除已归档。`arc afs search` 要带 `--json`。不传 `--limit` 时这一页最多 500 条。`--limit` 是正整数；这台手机只用 1 到 500，再大也会被收成 500。`meta.hasMore` 为 true 时才带 `--cursor`，值就是这一页的 `meta.cursor`。没有 `meta`，或 `hasMore` 不是 true，就停，不要自己编 cursor。`arc afs search --help` 里没有 `--cursor` 时，先升级 arc，不要改去自己 POST `/rpc`。响应正好 500 条且没有 `meta` 时，这台手机还没有搜索翻页，不要把这一页当成全部。集合和标签不走这个 cursor。条目搜索只有 `arc afs search`。
 
 | 写法 | 含义 |
 | --- | --- |
 | `论文 检索` | 关键字 AND。中文不需要自己分词 |
 | `tag:papers` | 按当前标签名过滤。多个 `tag:` AND |
 | `collection:阅读` | 按当前集合名过滤。多个 `collection:` AND |
-| `type:link` | 类型。多个 `type:` OR。别名是 link、note、text、image / photo、file、contact、event / calendar、place |
+| `type:video` | 类型。同一边的多个 `type:` 取并集。条目类型和内容类型都写了时，两条都要满足。不认识的词是空页 |
 | `link:example.com` 或 `site:example.com` | 打在 URL / host 上 |
 | `after:2026-01-01` `before:2026-02-01` | 按 `createdAt`。`after` 含当天，`before` 不含当天 |
 | `status:archived` | 把已归档也包括进来 |
 
-首页上的 Repos 不是 `type:repo` 或 `type:repos`。这两个查询是空页，别名里没有 repo。列表和搜索里的 type 是 link、note 这种 item type。Repos 在条目 JSON 的 `content.type`，值是 `repo`，这些条目的列表 type 仍是 `link`。没有前缀的关键字命中不是这一类。`ls` 和搜索命中都不带 `content.type`。读 `/aside/items/<slug>.json` 才能看到它。
+`type:` 里，条目类型是 `link`、`links`、`note`、`notes`、`place`、`places`、`event`、`events`、`calendar`、`images`。内容类型里，首页 tab 是 `articles`（article、recipe）、`videos`、`websites`、`products`、`repos`、`social`、`media`、`text`、`contacts`、`files`。单数 `article`、`recipe`、`video`、`product`、`app`、`repo`、`social`、`photo`、`photos`、`image`、`screenshot`、`music`、`podcast`、`movie`、`book`、`file`、`contact`、`calendarevent` 各指那一个 `content.type`。没有 `content.type` 的条目不会被内容类型选中。
 
-命中是 AFS 条目，带 `id` 和 `path`，没有正文，也不保证带标题。路径在 `/aside/items/` 下。要标题和正文就读这个路径。排序是索引顺序：精确 URL，精确标题，标题前缀，然后 bm25，然后 `createdAt` 降序。
+命中是 AFS 条目，带 `id` 和 `path`。没有正文，不保证有标题，也没有 `content.type`。路径在 `/aside/items/` 下。要标题、正文和 `content.type` 就读这个 JSON。`ls` 同样不带 `content.type`。排序是索引顺序：精确 URL，精确标题，标题前缀，然后 bm25，然后 `createdAt` 降序。
 
 ## 阅读和写入
 
@@ -287,4 +287,4 @@ cd ~/.aside-agent && arc afs mount remove /aside
 
 ## 协议
 
-手机接受的动作、错误和查询别名在 [references/protocol.md](references/protocol.md)。某台手机接受什么，以这次 `capabilities` 为准。对着真实前台监听的套件在 Aside 仓库 `design/aside-agent-mode/skill/`。
+手机接受的动作和错误在 [references/protocol.md](references/protocol.md)。`type:` 的词在上面的搜索表。某台手机接受什么，以这次 `capabilities` 为准。

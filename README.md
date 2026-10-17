@@ -131,7 +131,7 @@ When the phone advertises the capability, a Quick Note can hold text, images, li
 
 The iOS app, the connect page, and the engineering protocol live in [ArcBlock/aside](https://github.com/ArcBlock/aside). This repository is how a computer agent connects and reads or writes. Change phone behavior in Aside first, then in this skill.
 
-This repository no longer ships a computer-side client. Library operations are `arc afs` commands. The suite that talks to a real foreground listener stays in the Aside repository at `design/aside-agent-mode/skill/`.
+This repository no longer ships a computer-side client. Library operations are `arc afs` commands.
 
 `skills/aside-agent/references/protocol.md` is the copy an agent reads. The engineering source is `design/aside-agent-mode/PROTOCOL.md` in the Aside repository. The two copies can drift. A connected phone's `capabilities` response is what that phone accepts.
 

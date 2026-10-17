@@ -131,7 +131,7 @@ Quick Note 在手机公布了相应能力时，可以包含文字、图片、链
 
 iOS 应用、内容终端和工程协议在 [ArcBlock/aside](https://github.com/ArcBlock/aside)。这里只维护电脑上的 Agent 怎么连、怎么读写。手机行为先改 Aside，再改这里的 skill。
 
-这个仓库不再带电脑端客户端。库操作是 `arc afs`。对着真实前台监听的套件在 Aside 仓库的 `design/aside-agent-mode/skill/`。
+这个仓库不再带电脑端客户端。库操作是 `arc afs`。
 
 `skills/aside-agent/references/protocol.md` 是给 Agent 读的协议副本。工程原文是 Aside 仓库里的 `design/aside-agent-mode/PROTOCOL.md`。两边可以不一致。某台手机接受什么，以它连接后返回的 `capabilities` 为准。
 
