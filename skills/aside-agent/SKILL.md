@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Aside 电脑 Skill
@@ -24,7 +24,7 @@ Skill 不是安全边界。手机上的允许才是授权。电脑不能自己�
 
 ## 工作目录
 
-所有 `arc afs` 命令都在 `~/.aside-agent` 里跑，并带 `--standalone`。`arc afs mount` 只写当前目录的 `.afs-config/config.toml`，不进正在跑的 daemon。不带 `--standalone` 的 `arc afs ls` 会打到 daemon，看不到这次挂载。
+所有 `arc afs` 命令都在 `~/.aside-agent` 里跑，并带 `--standalone`。`arc afs mount` 只写当前目录的 `.afs-config/config.toml`，不进正在跑的 daemon。在 skill 目录里挂载也一样：命令可以返回已经挂上，正在跑的 daemon 上仍然没有 `/aside`。不带 `--standalone` 的 `arc afs ls` 会打到 daemon，看不到这次挂载。
 
 ```bash
 mkdir -p ~/.aside-agent
@@ -44,7 +44,7 @@ dns-sd -B _aside-agent._tcp local.
 dns-sd -L "服务名" _aside-agent._tcp local.
 ```
 
-`base` 用解析结果里的主机名和端口，形如 `http://HOST:PORT`。端口每次打开监听都会变，不要复用上一场的端口。不要把这个地址改成 IPv4 或其他主机。列表是空的，请告诉用户把 Aside 唤醒到前台。授权还在，不需要重新允许。点过结束连接，或已经断开了这一条，才需要重新打开终端页。页面不提供地址。不要扫描网段，也不要向用户要 `host:port`。
+`base` 用解析结果里的主机名和端口，形如 `http://HOST:PORT`。端口和四位标记每次重新打开监听都会变，不要复用上一场的端口。用户已经选定一台之后，下一次浏览用主机名对上那一台，沿用原来的凭证。不要把这个地址改成 IPv4 或其他主机。列表是空的，请告诉用户把 Aside 唤醒到前台。授权还在，不需要重新允许。点过结束连接，或已经断开了这一条，才需要重新打开终端页。页面不提供地址。不要扫描网段，也不要向用户要 `host:port`。
 
 4. 先发现，再判断版本。第一次可能连不上，用同一个 `base` 再试一次。不要换地址。
 
@@ -54,7 +54,7 @@ curl -sS "$BASE/agent/v1/discovery"
 
 `protocol` 必须是 `aside-agent`，`version` 必须是 `1`，并且 `requiresPairing` 和 `requiresPhoneAllow` 都为真。否则停止。告诉用户版本不一致，不要改去别的路径或再发明一个协议。
 
-5. 已有凭证时，先对这一次浏览到的 base 做 `probe`。成功就用这份凭证继续，跳到第 7 步，不要再配对。只有没有凭证、手机返回 `revoked`、或用户拒绝（`denied`）时才配对。
+5. 已有凭证时，先对这一次浏览到的 base 做 `probe`。成功就用这份凭证继续，跳到第 7 步，不要再配对。没有凭证，或 probe 得到 `unauthorized`、`revoked`、`denied` 时才配对。
 
 ```bash
 curl -sS -X POST "$BASE/agent/v1/probe" \
@@ -82,6 +82,8 @@ curl -sS -X POST "$BASE/agent/v1/claim" \
 ```
 
 把响应里的 `credential` 写入 `~/.aside-agent/credential` 并 `chmod 600`。不要打印凭证。`claim` 成功体没有 `expiresAt`。凭证没有时钟过期。用户断开这一条、拒绝，或结束全部连接，才会作废。
+
+领取第一次连不上时，用同一个 `base` 再请求一次。领到了就继续。还是连不上就停，请用户把 Aside 唤醒到前台。不要重新配对。
 
 7. 挂到 `/aside`。这是连接成功的条件。在 `~/.aside-agent` 里先卸再挂，避免旧端口和旧凭证留在配置里。URI 只含主机和端口。`allowPrivateNetwork` 必须用 `--set`。只写在查询参数里会被丢掉，局域网地址随后会触发 SSRF。凭证不进 URI。
 
@@ -120,19 +122,28 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside \
 cd ~/.aside-agent && arc afs search /aside/items "论文 tag:papers after:2026-01-01" --standalone --json
 ```
 
+下一页用上一页 JSON 里的 `meta.cursor`。路径和查询保持不变。
+
+```bash
+cd ~/.aside-agent && arc afs search /aside/items "论文 tag:papers after:2026-01-01" \
+  --cursor "CURSOR" --standalone --json
+```
+
 `/aside` 和 `/aside/items` 都会打到这份索引。别的路径不是这份索引。集合和标签用 `arc afs ls`，不要用前缀语言去搜它们。
 
-前缀大小写不敏感。没有前缀的词彼此 AND。空查询或纯空白是空页，不会返回最近条目。要看目录用 `ls`。只有前缀、没有关键字（例如 `tag:papers`、`type:link`）会查索引。默认排除已归档。`arc afs search` 不传 limit，手机最多返回 500 条，没有下一页。要收窄就改查询，不要发明 cursor。
+前缀大小写不敏感。没有前缀的词彼此 AND。空查询或纯空白是空页，不会返回最近条目。要看目录用 `ls`。只有前缀、没有关键字（例如 `tag:papers`、`type:link`）会查索引。默认排除已归档。`arc afs search` 要带 `--json`。不传 `--limit` 时这一页最多 500 条。`--limit` 是正整数；这台手机只用 1 到 500，再大也会被收成 500。`meta.hasMore` 为 true 时才带 `--cursor`，值就是这一页的 `meta.cursor`。没有 `meta`，或 `hasMore` 不是 true，就停，不要自己编 cursor。`arc afs search --help` 里没有 `--cursor` 时，先升级 arc，不要改去自己 POST `/rpc`。响应正好 500 条且没有 `meta` 时，这台手机还没有搜索翻页，不要把这一页当成全部。集合和标签不走这个 cursor。`arc afs exec` 的 `list` / `search` 用另一套 `nextCursor`，默认 50、最多 100。
 
 | 写法 | 含义 |
 | --- | --- |
 | `论文 检索` | 关键字 AND。中文不需要自己分词 |
 | `tag:papers` | 按当前标签名过滤。多个 `tag:` AND |
 | `collection:阅读` | 按当前集合名过滤。多个 `collection:` AND |
-| `type:link` | 类型。多个 `type:` OR。别名见协议 |
+| `type:link` | 类型。多个 `type:` OR。别名是 link、note、text、image / photo、file、contact、event / calendar、place |
 | `link:example.com` 或 `site:example.com` | 打在 URL / host 上 |
 | `after:2026-01-01` `before:2026-02-01` | 按 `createdAt`。`after` 含当天，`before` 不含当天 |
 | `status:archived` | 把已归档也包括进来 |
+
+首页上的 Repos 不是 `type:repo` 或 `type:repos`。这两个查询是空页，别名里没有 repo。列表和搜索里的 type 是 link、note 这种 item type。Repos 在条目 JSON 的 `content.type`，值是 `repo`，这些条目的列表 type 仍是 `link`。没有前缀的关键字命中不是这一类。`ls` 和搜索命中都不带 `content.type`。读 `/aside/items/<slug>.json` 才能看到它。
 
 命中是 AFS 条目，带 `id` 和 `path`，没有正文，也不保证带标题。路径在 `/aside/items/` 下。要标题和正文就读这个路径。排序是索引顺序：精确 URL，精确标题，标题前缀，然后 bm25，然后 `createdAt` 降序。
 
@@ -147,6 +158,8 @@ cd ~/.aside-agent && arc afs ls /aside/items --standalone --json
 cd ~/.aside-agent && arc afs read /aside/items/ITEM.json --standalone --json
 cd ~/.aside-agent && arc afs stat /aside/items/ITEM.json --standalone --json
 ```
+
+整页 JSON 不要用 Node 的 `spawnSync` 或 `execFileSync` 接进内存。就算 `maxBuffer` 放到 64MB，stdout 也会在 8192 字节处截断。先把输出写到文件，再解析那个文件。
 
 `resourceVersion` 是该 JSON 文件字节的 SHA-256，用 `stat` 的 sha256，或上一次 exec 返回的 `resourceVersion`。它不是文件里的 `updatedAt`。
 
@@ -246,11 +259,11 @@ cd ~/.aside-agent && arc afs mount remove /aside
 
 ## 恢复
 
-- 锁屏或离开较久：监听先停，授权还在。请告诉用户把 Aside 唤醒到前台，然后重新浏览。已有凭证就对这次的 base 先 `probe`。成功就用新端口重新 `mount add`，不要重新配对。
+- 锁屏或离开较久：监听先停，授权还在。没有超时的 HTTP 请求会一直挂住。连不上就停，不要空转。请告诉用户把 Aside 唤醒到前台，然后重新浏览。已有凭证就对这次的 base 先 `probe`。成功就用新端口重新 `mount add`，不要重新配对。
 - 用户点了结束连接，或在手机上断开了这一条：这一份作废。请用户重新打开终端页。重新浏览。只有一台就直接用，多台再请用户选。然后重新配对并再次允许。
 - 用户只是离开了终端页，或短暂切到别的应用：连接还在。一次库命令失败，而 `probe` 仍然成功时，用同一个 base 再试那一次。不要重新配对。连不上再浏览。浏览仍然能找到这台手机时，用原来的凭证。
 - 切换资料库或账号：授权还在，不要重新配对。资料库还在换时会以 `library-changing` 失败。用同一份凭证再试。对齐之后，读写落在现在打开的库。
-- 同一局域网：手机重启监听后，四位标记和端口都会变。多台时以这次浏览和手机上的标记为准。
+- 同一局域网：手机重启监听后，四位标记和端口都会变。已经选定的那一台用主机名认，沿用原来的凭证再 `probe`。用户还没选定、网上又有多台时，才对照手机上的标记来选。
 - 用户在手机上拒绝：得到 `denied`。停下来问用户是否要重新配对。不要继续领取。
 - 配对超时或码已使用：得到 `pairing-expired` 或 `pairing-used`。重新配对，让用户对照新的码。
 - 凭证被撤销：`revoked`。这一份不能再用。需要的话另配一次。

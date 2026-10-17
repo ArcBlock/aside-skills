@@ -29,7 +29,7 @@ In Claude Code, Cursor, Codex, Gemini CLI, or Grok, say “connect my Aside.” 
 
 **Organize in place.** “Make a Reading list and put these in it” or “tag this one Travel.” Tags, collections, and membership are written back to the same library. An edit to an existing note carries the version just read, so a newer edit you made on the phone is left as it is.
 
-**Search and organize that same library from the computer.** After pairing, the library is mounted at `/aside`. Search uses `arc afs search` and the phone's library index: keywords, Chinese text, tags, collections, types, links, and dates. Reading, notes, tags, and collections also go through `arc afs`. If [arc](https://arc.afsd.io) is missing, install it first.
+**Search and organize that same library from the computer.** After pairing, the library is mounted at `/aside`. Search uses `arc afs search` and the phone's library index: keywords, Chinese text, tags, collections, types, links, and dates. One page holds at most 500 hits. When the JSON has `meta.hasMore`, the same search with `--cursor` reads the next page. Reading, notes, tags, and collections also go through `arc afs`. If [arc](https://arc.afsd.io) is missing, install it first.
 
 Several computers and several agents can be connected at once. The phone shows which tool, which computer, and what it is doing. You can disconnect one session. Changes already saved stay.
 
