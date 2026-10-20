@@ -31,6 +31,8 @@ In Claude Code, Cursor, Codex, Gemini CLI, or Grok, say “connect my Aside.” 
 
 **Organize in place.** “Make a Reading list and put these in it” or “tag this one Travel.” Tags, collections, and membership are written back to the same library. An edit to an existing note carries the version just read, so a newer edit you made on the phone is left as it is.
 
+**Publish a collection.** “Publish this collection” asks visibility, comments, author, and layout, then publishes. This happens only when the phone lists `publishCollection` and `publish.ready` is true. Without an Arc Space login the agent says so and does not ask. The account name is not that check.
+
 **Search and organize that same library from the computer.** After pairing, the library is mounted at `/aside`. Search uses `arc afs search` and the phone's library index: keywords, Chinese text, tags, collections, types, links, and dates. One page holds at most 500 hits. When the JSON has `meta.hasMore`, the same search with `--cursor` reads the next page. Reading, notes, tags, and collections also go through `arc afs`. If [arc](https://arc.afsd.io) is missing, install it first.
 
 Several computers and several agents can be connected at once. The phone shows which tool, which computer, and what it is doing. You can disconnect one session. Changes already saved stay.
@@ -127,7 +129,7 @@ When the phone advertises the capability, a Quick Note can hold text, images, li
 
 | Skill | Version | Use it to |
 | --- | --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | 0.3.4 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, library items when the phone lists createItem, search and read, tags, collections, and membership. |
+| [aside-agent](./skills/aside-agent/SKILL.md) | 0.3.5 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, library items when the phone lists createItem, search and read, tags, collections, membership, and publishing a collection when publish.ready is true. |
 
 ## Maintaining this repository
 

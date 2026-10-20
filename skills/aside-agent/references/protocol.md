@@ -9,7 +9,7 @@
 ## 决定
 
 - 不使用 `AFSHTTPServer` 的单个 `authToken`。那个 Bearer 是进程级的，撤销不了单独一个会话，也会把整个 AFS 树带出去。
-- 不导出 `/user`、`/dev`、`/kv`、`/afs`。装上内容投影之后，`POST /rpc` 只提供当前登录库：客户端的 `/` 对应手机 AFS 的 `/user`，返回路径去掉 `/user` 前缀。配对、领取和探针仍走 `/agent/v1`。`delete`、`rename`、`write` 不落盘。笔记、标签、集合、成员和待确认删除走 `exec /.actions/aside`。
+- 不导出 `/user`、`/dev`、`/kv`、`/afs`。装上内容投影之后，`POST /rpc` 只提供当前登录库：客户端的 `/` 对应手机 AFS 的 `/user`，返回路径去掉 `/user` 前缀。配对、领取和探针仍走 `/agent/v1`。`delete`、`rename`、`write` 不落盘。笔记、标签、集合、成员、发布集合和待确认删除走 `exec /.actions/aside`。发布集合是登录凭证加上远程声明，不是本地文件写入。
 - 不恢复 `LocalAFSDebugHTTPServer`、`ensureDebugHTTPServer`、`startDebugHTTPServer`。
 - 发现载荷只在监听期间存在。它是以后 `_aside-agent._tcp` TXT 要逐字携带的连接元数据。`AsideAFSService` 使用的默认监听器绑定 IPv4 `INADDR_ANY`（`0.0.0.0`）的临时端口，发现载荷带 `port`，`transport` 为 `tcp`。测试可以注入不打开套接字的工厂，那种发现载荷没有 `port`，`transport` 为 `in-process`。
 - v1 是 cleartext TCP（明文，不实现 TLS）。监听期间手机会注册 Bonjour `_aside-agent._tcp`。电脑只浏览这一个服务类型。只有一台时直接连接，多台时由用户选中后再连接。不扫描网段，也不探测其它端口。页面只显示服务名，不显示 `host:port`。离开终端页不停止监听。短暂离开前台大约三分钟内套接字保持。超过大约三分钟、锁屏或断网通知会先停套接字，授权还在，回到前台会重新打开。结束连接和确认断开会撤销。资料库或账号切换不停监听，也不撤销。Wi-Fi 不是信任。配对码和 Bearer 在撤销之前，对同一局域网上的观察者可见。
@@ -203,7 +203,7 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 
 | `action` | 行为 | 既有函数 |
 | --- | --- | --- |
-| `capabilities` | `items` / `collections` / `tags` 目录是否存在，加上 `/.meta` 里路径恰好为 `/user` 的 operations。另有 `note.kind` 与 `note.blocks`。不倾倒正文，也不列出 `/dev` 或 `/kv` | `AFS.read("/.meta")` |
+| `capabilities` | `items` / `collections` / `tags` 目录是否存在，加上 `/.meta` 里路径恰好为 `/user` 的 operations。另有 `note.kind`、`note.blocks` 和 `publish`。`publish.ready` 为真才表示当前有登录凭证。凭证为空时 `publish.ready` 为假、`publish.reason` 为 `arc-space`，不论 `account.name` 是「本机」还是 DID。响应不含凭证。不倾倒正文，也不列出 `/dev` 或 `/kv` | `AFS.read("/.meta")`、`HostLoginToken.persisted()` |
 | `list` | 分页列出。`resource` 为 `items`、`collections` 或 `tags` | `UserSpaceDocumentReader.listItems` / `listCollections` / `listTags` |
 | `query`、`search` | `items` 走资料库索引，不先列出再做子串。前缀是 `tag:`、`collection:`、`type:`、`link:` / `site:`、`after:` / `before:`、`status:archived`。默认排除已归档，`status:archived` 才包括它们。空查询或纯空白是空页。只有前缀、没有关键字也会查索引。`collections` 和 `tags` 仍是名称子串（集合再加描述），按 id 排序，空查询是空页。返回仍是 `id`、`title`、`type`、`resourceVersion`，没有正文。电脑上的条目搜索不走这个 action，走上面的 `arc afs search` | `LibrarySearchIndex`（items）；名称子串（collections、tags） |
 | `read` | 读一条。返回 `resourceVersion`。笔记的 `text` 原样读回。有 Quick Note 时另返回 `noteKind` 与不含字节的 `noteBlocks`。有 `content.type`、地点或日历时一并读回。文章正文只从该条目自己的 `content.md` 载入 `markdown`，不接受调用方给的路径。`cover` 指向素材根下的普通文件时返回 `coverBase64` 与 `coverByteCount`。符号链接或逃出素材根的路径不返回字节 | `item(id:folder:)`、`collection(id:folder:)`、`listTags(folder:)` |
@@ -216,6 +216,7 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 | `setItemTag` | `member` 为真则按名称确保标签并挂到这条 item；为假则从这条 item 拿下，标签本身还在。带当前 `resourceVersion`。已经挂上再挂一次不会重复 | `UserSpaceDocumentWriter.tagItem` / `untagItem` |
 | `createCollection`、`updateCollection` | 新建或改名，改名保留 slug | `UserSpaceDocumentWriter.persistCollection` |
 | `setMembership` | `member` 为真则加入，否则移出 | `addItemCollection` / `removeItemCollection` |
+| `publishCollection` | 把一个已经存在的集合按发布页的同一份计划声明出去。只有这次 `capabilities` 的 `actions` 含有它，并且 `publish.ready` 为真，才调用。凭证为空时 HTTP 403 `forbiddenError` / `arc-space`，不访问网络。`collectionId` 必须是已有集合。`visibility` 是 `public` 或 `unlisted`，`comments` 是 `off`、`open` 或 `locked`，`author` 是 `off` 或 `on`，`view` 是 `masonry`、`list` 或 `timeline`。不认识的值拒绝，不发布。`locked` 只在线上已经锁定时可以原样留下，不能改开或改关。缺省的项保持已发布记录；没有记录时用发布页默认：公开、评论关、不显示作者、瀑布流。成功返回 `url` 以及实际发出的 `visibility`、`comments`、`author`、`view`。不把整棵 `/dev` 交出去 | `CollectionPublishSheet.loadSeed`、`CollectionPublishSheet.perform` |
 | `delete` | 只登记待确认，不删除 | 无删除 |
 | `batch` | 逐项执行上面的非删除写操作 | 同上 |
 | `confirm`、`confirmDelete` | 网络上不能确认 | 返回 `aside.agent.allow` |

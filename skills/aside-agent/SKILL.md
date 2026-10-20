@@ -1,11 +1,11 @@
 ---
 name: aside-agent
-description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，把当前资料库挂到 /aside，再用 arc afs 搜索、阅读和写入。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。要把链接、文本、图片、照片、文件、联系人、日程或地点存成各自的资料库条目时，只有这次 capabilities 的 actions 含有 createItem 才调用它，不要改用 Quick Note 去凑。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。条目搜索用 arc afs search，不要另写 HTTP 客户端。不要扫描网段，不要导出 /user、/dev 或 /kv。
+description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，把当前资料库挂到 /aside，再用 arc afs 搜索、阅读和写入。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。要把链接、文本、图片、照片、文件、联系人、日程或地点存成各自的资料库条目时，只有这次 capabilities 的 actions 含有 createItem 才调用它，不要改用 Quick Note 去凑。用户要发布某个集合时，只有 actions 含有 publishCollection 且 publish.ready 为真，才先问可见性、评论、作者和版式，再调用它。ready 不是真就说明需要登录 Arc Space，不要用账号名字判断，也不要自己编没有动作可提交的问法。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。条目搜索用 arc afs search，不要另写 HTTP 客户端。不要扫描网段，不要导出 /user、/dev 或 /kv。
 license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.3.4"
+  version: "0.3.5"
 ---
 
 # Aside 电脑 Skill
@@ -63,7 +63,7 @@ curl -sS -X POST "$BASE/agent/v1/probe" \
   -d '{}'
 ```
 
-`ASIDE_TOKEN` 从凭证文件读入，不要 `echo`。`account.name` 是手机当前打开的账号，用这个名字。电脑不能另选账号。
+`ASIDE_TOKEN` 从凭证文件读入，不要 `echo`。`account.name` 是手机当前打开的账号，用这个名字。电脑不能另选账号。这个名字不决定能不能发布集合。
 
 6. 配对。把返回的工具名、设备名和配对码立刻给用户，并马上领取。手机上的配对码大约 60 秒后过期。不要在这个窗口里读源码或做别的事。配对码不是凭证。不要在电脑上调用允许。网上的 `/agent/v1/allow` 会拒绝。
 
@@ -104,7 +104,7 @@ cd ~/.aside-agent && arc afs ls /aside --standalone --json
 
 这一步成功，连接就成功了。`/aside` 就是手机上当前登录的资料库，下面是 `items`、`collections`、`tags`。挂载失败时不要改试别的地址，不要扫描网段，也不要另写一个 HTTP 客户端。私网被拒绝时，检查 `--set allowPrivateNetwork=true` 是否真的传给了这次 `mount add`。
 
-8. 写笔记或资料库条目前先看能力。动作必须出现在返回的 `actions` 里。嵌入块的种类必须出现在 `note.blocks` 里。没有 `note` 时只写纯文字。没有 `createItem` 时不要调用它，也不要把链接、地点、文件或联系人改写成 Quick Note。
+8. 写笔记、资料库条目或发布集合前先看能力。动作必须出现在返回的 `actions` 里。嵌入块的种类必须出现在 `note.blocks` 里。没有 `note` 时只写纯文字。没有 `createItem` 时不要调用它，也不要把链接、地点、文件或联系人改写成 Quick Note。没有 `publishCollection`，或 `publish.ready` 不是真，就不要发布，也不要先问发布配置。
 
 ```bash
 cd ~/.aside-agent && arc afs exec /aside/.actions/aside \
@@ -218,6 +218,33 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --ar
   "collectionId": "COLLECTION_ID"
 }'
 ```
+
+发布一个已经存在的集合用 `publishCollection`。先看这次 `capabilities`。`actions` 里没有它，就停下来说明这台手机还不能发布。不要自己写 HTTP，也不要先问一套没有动作可提交的配置。`publish.ready` 不是真时同样不要调用，也不要问配置。`publish.reason` 为 `arc-space` 表示没有登录凭证。告诉用户「只有登录并获得 Arc Space 之后才能进行此操作」，请他在手机上登录 Arc Space。登录之后换一个新的 `operationId` 再发。沿用被拒绝的那次 id 只会重放这次拒绝。`account.name` 是「本机」或一段 DID 都不作为依据。响应里没有凭证，不要去读或打印它。
+
+`publish.ready` 为真，并且知道要发布哪一个集合之后，先问这四项。他已经说出选择，或明确说用默认、直接发布时，不要再问。一次问完：
+
+- 可见性：公开（默认）或未列出。请求值是 `public` 或 `unlisted`。
+- 评论：关（默认）、开，或锁定。请求值是 `off`、`open` 或 `locked`。锁定只在这条已经发布且评论已是锁定时留下。不要把没锁定的改成锁定，也不要把已锁定的改成开或关。
+- 作者：关（不显示，默认）或开（显示）。请求值是 `off` 或 `on`。
+- 版式：瀑布流（默认）、列表或时间线。请求值是 `masonry`、`list` 或 `timeline`。不要传别的值。
+
+他说用默认或直接发布时，这四项都不要放进请求。没有发布记录时，手机用公开、评论关、不显示作者、瀑布流。已经发布过的集合保持原来的四项。他点名的项才放进请求。
+
+`collectionId` 是集合的 id，不是名字。先在 `/aside/collections` 里对上他要的那一个。对上多个时先问是哪一个。每次发布用新的 `operationId`。成功时把 `url` 给他，它以 `https://` 开头。同时用响应里的 `visibility`、`comments`、`author`、`view` 说明这次实际发出的配置。不要自己编 slug，也不要 `arc afs write`。发布不是往本地树上写文件。
+
+```bash
+cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --args '{
+  "action": "publishCollection",
+  "operationId": "OP_ID",
+  "collectionId": "COLLECTION_ID",
+  "visibility": "public",
+  "comments": "off",
+  "author": "off",
+  "view": "masonry"
+}'
+```
+
+得到 HTTP 403 且 `reason` 为 `arc-space` 时，用上面那句登录说明。不认识的配置值会被拒绝，集合不会发布。评论改成锁定，或把已锁定改成开或关，也会被拒绝。这时说明这条评论不能这样改，请改选关或开，或在请求里不要带 `comments` 以保持原样。
 
 改一条已有笔记要带刚读到的 `resourceVersion`。要保留嵌入，`blocks` 必须是完整列表。已经在这篇笔记上的图片、音频、文件、视频可以只写 `resourceId`。要从别的条目复制进来，写 `sourceItemId` 和 `resourceId`，不要只写别的条目的 `resourceId`。只传 `text` 会把这篇收成一段文字。
 
