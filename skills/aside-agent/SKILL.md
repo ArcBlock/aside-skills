@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.3.2"
+  version: "0.3.3"
 ---
 
 # Aside 电脑 Skill
@@ -184,7 +184,7 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --ar
 }'
 ```
 
-有嵌入时以 `blocks` 为准，可以不再传 `text`。链接只给 http 或 https 的 `url`。地点用 `latitude` 和 `longitude`，`kind` 写 `location` 或 `place`。库里已经有的图片、音频、文件、视频不要读出来再传字节。块上写 `sourceItemId` 和 `resourceId`，不写 `contentBase64`。手机把那一条自己的附件复制进新笔记自己的 assets 目录，并分配新的 `resourceId`。笔记不保留 `sourceItemId`。删掉来源条目不会删掉新笔记里的这份文件。`filename` 可以不写。还没进库的新字节才放在 `contentBase64`，并且要有不带路径的 `filename`。可以带 `mimeType`。音频和视频可以带 `duration`。图片最多 9 张，每张不超过 20MB。音频和文件每条不超过 20MB。图片、音频、文件合计不超过 60MB。视频最多 1 条，不超过 200MB，时长不超过 15 秒。不接收天气。`--args` 走命令行，放不下的新字节不要改去自写 HTTP。告诉用户这条附件太大。
+有嵌入时以 `blocks` 为准，可以不再传 `text`。链接只给 http 或 https 的 `url`。地点用 `latitude` 和 `longitude`，`kind` 写 `location` 或 `place`。库里已经有的图片、音频、文件、视频不要读出来再传字节。块上写 `sourceItemId` 和 `resourceId`，不写 `contentBase64`。手机把那一条自己的附件复制进新笔记自己的 assets 目录，并分配新的 `resourceId`。笔记不保留 `sourceItemId`。删掉来源条目不会删掉新笔记里的这份文件。`filename` 可以不写。还没进库的新字节才放在 `contentBase64`，并且要有不带路径的 `filename`。可以带 `mimeType`。音频和视频可以带 `duration`。图片最多 9 张，每张不超过 20MB。音频和文件每条不超过 20MB。图片、音频、文件合计不超过 60MB。视频最多 1 条，不超过 200MB，时长不超过 15 秒。不接收天气。`--args` 走命令行，大约 1MB 就放不下。放不下时把同一份 JSON 从 stdin 送进去，不要改去自写 HTTP。手机一次请求最多 32MB。再大就告诉用户这条附件太大。
 
 ```bash
 cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --args '{

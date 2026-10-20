@@ -123,9 +123,9 @@ Quick Note 在手机公布了相应能力时，可以包含文字、图片、链
 
 ## 现在的 skill
 
-| Skill | 你用它来 |
-| --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | 连接同一 Wi-Fi 上的 Aside iPhone，读写当前资料库：记 Quick Note，搜索和阅读，维护标签、集合和成员关系。 |
+| Skill | 版本 | 你用它来 |
+| --- | --- | --- |
+| [aside-agent](./skills/aside-agent/SKILL.md) | 0.3.3 | 连接同一 Wi-Fi 上的 Aside iPhone，读写当前资料库：记 Quick Note，搜索和阅读，维护标签、集合和成员关系。 |
 
 ## 维护这个仓库
 

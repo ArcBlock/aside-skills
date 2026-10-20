@@ -195,7 +195,7 @@ HTTP 体：
 
 电脑 skill 不另写 HTTP 客户端。配对、领取和探针仍走 `/agent/v1`。库挂到 `/aside` 之后，条目搜索是 `arc afs search /aside/items`（或 `/aside`），也就是这里的 RPC `search`。`/items` 与库根走 #2369 的资料库索引。没给 `limit` 时一页 500 条。传入的 `limit` 钳在 1...500，`0` 会变成 1。`cursor` 是十进制非负偏移，缺省从 0 开始；空字符串也是 0。还有下一页时成功体带 `meta`：`cursor` 是下一页偏移，`hasMore` 为 true。已经走完时不带 `meta`。越过末尾是空的 `data`，不是校验错误。`abc`、负数、带小数的 cursor 是 `invalid agent request`（HTTP 200，`code` 5）。空查询也先校验 cursor。集合和标签不是这份索引，没有这个 cursor。空查询是空页。电脑上翻页是 `arc afs search <path> <query> --limit <n> --cursor <meta.cursor> --json`。两个参数都不传时，请求与以前相同。`arc afs search` 聚合后的 JSON 带 `meta`，不带手机 RPC 体上的 `total`。写操作是 `arc afs exec /aside/.actions/aside`。不要调用 `/.actions/query`。
 
-v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发现对象，不追加密钥。监听仍是 IPv4 `INADDR_ANY`，待配对上限仍是 8。本接口会把条目正文和附件字节放进响应。凭证有效的那段时间里，同一局域网上的观察者可以读到这些字节。这是残留，不是另开一条加密通道。监听线程等待响应，写入在主演员上 await 既有库函数。没有第二条 HTTP 服务。
+v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发现对象，不追加密钥。监听仍是 IPv4 `INADDR_ANY`，待配对上限仍是 8。本接口会把条目正文和附件字节放进响应。凭证有效的那段时间里，同一局域网上的观察者可以读到这些字节。这是残留，不是另开一条加密通道。监听线程等待响应，写入在主演员上 await 既有库函数。请求正文上限是 32MB。更大的 `Content-Length` 在读正文之前拒绝，响应是 `invalid agent request`。没有第二条 HTTP 服务。
 
 `AsideAFSService` 在 `self` 存在后安装一次。挂载闭包指向当前的 `userSpaceFolder` 和已经挂上的 `afs`，也就是应用正在用的 `/user` 库。安装本身不调用 `start()`。
 
