@@ -1,11 +1,11 @@
 ---
 name: aside-agent
-description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，把当前资料库挂到 /aside，再用 arc afs 搜索、阅读和写入。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。条目搜索用 arc afs search，不要另写 HTTP 客户端。不要扫描网段，不要导出 /user、/dev 或 /kv。
+description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，把当前资料库挂到 /aside，再用 arc afs 搜索、阅读和写入。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。要把链接、文本、图片、照片、文件、联系人、日程或地点存成各自的资料库条目时，只有这次 capabilities 的 actions 含有 createItem 才调用它，不要改用 Quick Note 去凑。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。条目搜索用 arc afs search，不要另写 HTTP 客户端。不要扫描网段，不要导出 /user、/dev 或 /kv。
 license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.3.3"
+  version: "0.3.4"
 ---
 
 # Aside 电脑 Skill
@@ -104,7 +104,7 @@ cd ~/.aside-agent && arc afs ls /aside --standalone --json
 
 这一步成功，连接就成功了。`/aside` 就是手机上当前登录的资料库，下面是 `items`、`collections`、`tags`。挂载失败时不要改试别的地址，不要扫描网段，也不要另写一个 HTTP 客户端。私网被拒绝时，检查 `--set allowPrivateNetwork=true` 是否真的传给了这次 `mount add`。
 
-8. 写带嵌入的笔记之前先看能力。动作必须出现在返回的 `actions` 里，块种类必须出现在 `note.blocks` 里。没有 `note` 时只写纯文字。
+8. 写笔记或资料库条目前先看能力。动作必须出现在返回的 `actions` 里。嵌入块的种类必须出现在 `note.blocks` 里。没有 `note` 时只写纯文字。没有 `createItem` 时不要调用它，也不要把链接、地点、文件或联系人改写成 Quick Note。
 
 ```bash
 cd ~/.aside-agent && arc afs exec /aside/.actions/aside \
@@ -199,6 +199,25 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --ar
 ```
 
 返回的 `noteKind` 是 `quickNote`。`noteBlocks` 不含字节。要字节就用 `readAttachment`，`attachment` 用块上的 `resourceId`。
+
+资料库条目不是 Quick Note。用户要把几家店的链接、一段文字、一张或一组照片、一个文件、一个联系人、一场日程或一个地点各自存成一条时，用 `createItem`。先看这次 `capabilities` 的 `actions`。没有 `createItem` 就停下来说明这台手机还不能建这种条目，不要改用 `createNote`。`type` 只能是 `link`、`text`、`image`、`photos`、`file`、`contact`、`calendarEvent`、`place`。`type` 为 `note` 会被拒绝，笔记仍走 `createNote`。
+
+`link` 要有 http 或 https 的 `url` 和 `title`。详情页上的那句说明写在 `notes`。要让 `type:article` 这类搜索找到它，把已有的内容类型写在 `contentType`，手机会存进 `content.type`。不写时按 URL 识别。`contentType` 必须是手机已有的 ContentType 原值，例如 `article`、`video`、`repo`。`calendarEvent` 保持这个驼峰。不认识的值会被拒绝，并且不创建条目。`place` 要有标题（`title` 或 `name`）以及 `latitude`、`longitude`，`address` 可选。`text` 要有 `text`。`contact` 要有 `title`。已有 vCard 放在 `text`；否则用 `phones`、`emails`、`addresses` 这些字符串数组，再加上可选的 `organization`，手机会拼成已保存的 `Name`、`Tel:`、`Email:`、`Org:`、`Addr:` 行。`calendarEvent` 要有 `title`、`startsAt`、`endsAt`，时间是 ISO8601，结束不早于开始。`timeZone` 缺省为手机当前时区，必须是已知时区标识。`isAllDay` 缺省为假。`location` 可选。`image` 正好一张图，`photos` 一到九张，`file` 正好一个文件。新字节放在 `contentBase64`，并带上不带路径的 `filename`。多张图放在 `attachments` 数组里，每项同样是字节或来源。库里已经有的图片或文件不要读出来再传字节，在对应项上写 `sourceItemId` 和 `resourceId`。手机把来源附件目录里的普通文件复制进新条目自己的 `assets/<slug>/attachments/`，分配新的 `resourceId`，不保存 `sourceItemId`。删掉来源不会删掉这份新文件。大小限制与上面的笔记附件相同。`--args` 放不下时，把同一份 JSON 从 stdin 送进去。可选 `collectionId`，它是已经存在的集合 id，不是集合名字。没有这个集合时先 `createCollection`，再用返回的 id。成员写在这条自己的 `collectionIds` 上。
+
+写完再读同一条。`type` 与请求一致，不出现 `noteKind`。`notes` 就是详情里的 Note。`resourceVersion` 是条目 JSON 字节的 SHA-256。带了 `contentType` 的链接，用对应的 `type:` 搜索能找到它。
+
+```bash
+cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --args '{
+  "action": "createItem",
+  "operationId": "OP_ID",
+  "type": "link",
+  "url": "https://example.com/shop",
+  "title": "Corner shop",
+  "notes": "Open on Sundays",
+  "contentType": "article",
+  "collectionId": "COLLECTION_ID"
+}'
+```
 
 改一条已有笔记要带刚读到的 `resourceVersion`。要保留嵌入，`blocks` 必须是完整列表。已经在这篇笔记上的图片、音频、文件、视频可以只写 `resourceId`。要从别的条目复制进来，写 `sourceItemId` 和 `resourceId`，不要只写别的条目的 `resourceId`。只传 `text` 会把这篇收成一段文字。
 

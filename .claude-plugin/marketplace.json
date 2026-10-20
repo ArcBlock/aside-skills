@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Agent Skills for Aside. Connect a computer agent to an Aside phone on the same LAN and organize the current library.",
-    "version": "0.3.3"
+    "version": "0.3.4"
   },
   "plugins": [
     {

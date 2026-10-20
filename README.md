@@ -25,6 +25,8 @@ In Claude Code, Cursor, Codex, Gemini CLI, or Grok, say “connect my Aside.” 
 
 **Save something onto the phone.** “Write down what we just discussed” creates a Quick Note. The body can be text. When this phone accepts rich notes, the note can also hold images, links, places, audio, files, and one short video. After writing, the agent reads the note back and checks that the phone and this write agree.
 
+**Save a link, place, or file as its own item.** When this phone lists `createItem`, the agent can save a link, text, photo, file, contact, event, or place as that kind of library item, with an optional note and an existing collection. A Quick Note stays a Quick Note. A phone that does not list `createItem` cannot do this yet.
+
 **Find what you already saved.** “Find the Kyoto trip I saved” or “read that note.” The agent can search, page through results, read the body, and fetch images and attachments as the content itself.
 
 **Organize in place.** “Make a Reading list and put these in it” or “tag this one Travel.” Tags, collections, and membership are written back to the same library. An edit to an existing note carries the version just read, so a newer edit you made on the phone is left as it is.
@@ -125,7 +127,7 @@ When the phone advertises the capability, a Quick Note can hold text, images, li
 
 | Skill | Version | Use it to |
 | --- | --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | 0.3.3 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, search and read, tags, collections, and membership. |
+| [aside-agent](./skills/aside-agent/SKILL.md) | 0.3.4 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, library items when the phone lists createItem, search and read, tags, collections, and membership. |
 
 ## Maintaining this repository
 
