@@ -29,7 +29,7 @@ Aside 用来随手把链接、图片、文件和想法收成一条条可以打�
 
 **就地整理。** 「建一个『待读』集合，把这几条放进去」「给这篇加上『旅行』」。标签、集合和成员关系写回同一份库。改已有笔记时带着刚读到的版本，避免盖掉你在手机上刚做的修改。
 
-**在电脑上搜索和整理同一份库。** 配对之后，资料库挂在 `/aside`。查找用 `arc afs search`，走的是手机上那份资料库索引：关键字、中文、标签、集合、类型、链接和日期。阅读、笔记、标签和集合也走 `arc afs`。电脑上还没有 [arc](https://arc.afsd.io) 时，先安装它。
+**在电脑上搜索和整理同一份库。** 配对之后，资料库挂在 `/aside`。查找用 `arc afs search`，走的是手机上那份资料库索引：关键字、中文、标签、集合、类型、链接和日期。一页最多 500 条。JSON 里 `meta.hasMore` 为真时，同一条搜索加上 `--cursor` 读下一页。阅读、笔记、标签和集合也走 `arc afs`。电脑上还没有 [arc](https://arc.afsd.io) 时，先安装它。
 
 几台电脑、几个 Agent 可以同时连着。手机上能看到是哪一个工具、哪一台设备、正在做什么。点某一条可以单独断开。已经保存的改动会留下。
 
@@ -131,7 +131,7 @@ Quick Note 在手机公布了相应能力时，可以包含文字、图片、链
 
 iOS 应用、内容终端和工程协议在 [ArcBlock/aside](https://github.com/ArcBlock/aside)。这里只维护电脑上的 Agent 怎么连、怎么读写。手机行为先改 Aside，再改这里的 skill。
 
-这个仓库不再带电脑端客户端。库操作是 `arc afs`。对着真实前台监听的套件在 Aside 仓库的 `design/aside-agent-mode/skill/`。
+这个仓库不再带电脑端客户端。库操作是 `arc afs`。
 
 `skills/aside-agent/references/protocol.md` 是给 Agent 读的协议副本。工程原文是 Aside 仓库里的 `design/aside-agent-mode/PROTOCOL.md`。两边可以不一致。某台手机接受什么，以它连接后返回的 `capabilities` 为准。
 
