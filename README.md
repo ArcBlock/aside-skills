@@ -129,7 +129,7 @@ When the phone advertises the capability, a Quick Note can hold text, images, li
 
 | Skill | Version | Use it to |
 | --- | --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | 0.3.5 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, library items when the phone lists createItem, search and read, tags, collections, membership, and publishing a collection when publish.ready is true. |
+| [aside-agent](./skills/aside-agent/SKILL.md) | 0.3.6 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, library items when the phone lists createItem, search and read, tags, collections (including trade show, trip, and research templates), membership, and publishing a collection when publish.ready is true. |
 
 ## Maintaining this repository
 

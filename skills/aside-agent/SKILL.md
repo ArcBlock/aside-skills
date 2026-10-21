@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.3.5"
+  version: "0.3.6"
 ---
 
 # Aside 电脑 Skill
@@ -268,7 +268,13 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --ar
 }'
 ```
 
-`updateTag`、`createCollection`、`updateCollection`、`setMembership`、`setItemTag` 的字段在协议的内容动作表里。`setItemTag` 用 `itemId` 和 `name`。`member` 为真时，没有同名标签会先建好再挂上。为假时只从这条 item 拿下，标签本身还在。
+`updateTag`、`createCollection`、`updateCollection`、`setMembership`、`setItemTag` 的字段在协议的内容动作表里。`setItemTag` 用 `itemId`。用户自己的标签用 `name`：`member` 为真时，没有同名用户标签会先建好再挂上；为假时只从这条 item 拿下，标签本身还在。系统标签用 `slug`，不要用 `ensureTag` 去建一个同名标签。那个新 id 不会进概览分组。
+
+`createCollection` 和 `updateCollection` 的说明写在 `description`。手机会存成 `descriptionText`。`descriptionText` 和 `desc` 也接受。不传说明时，更新保留原来的说明。空白会清掉。改名仍然保留 slug。写完读回同一条，`description` 和请求一致才算写上。读回来是空的，说明这台手机的集合更新还只存名字，不要当成已经写上。
+
+普通集合不传 `kind`。模板传 `kind`：展会 `tradeShow`，旅行 `travel`（`trip` 同样接受），研究 `research`。写完读回的 `kind` 必须是这一个。读回来仍是 `collection`，说明这台手机还不会建模板，不要继续打标签，也不要当成已经分组。展会和旅行可以带 `startsAt`、`endsAt`（`yyyy-MM-dd`）以及 `locationName`、`latitude`、`longitude`。研究和普通集合不要带日期或地点。展会没有概览分组，条目只进成员列表。产品研究 `productResearch` 也没有概览分组。
+
+已有条目用 `setMembership` 放进集合，`collectionId` 用集合 id。新建条目也可以在 `createItem` 里带这个 id。然后按 [references/protocol.md](references/protocol.md) 的「模板集合」表打 `slug`。旅行概览是吃喝 `travel-food`、攻略 `travel-guide`、预订 `travel-stay` 或 `travel-ticket`、随记 `travel-note`。照片看条目类型 `image` 或 `photos`，不必再打 `travel-photo`。地图上的去过必须是带经纬度的 `place`，再打 `travel-visited`（手机会同时挂上 `travel-place`）。研究概览是论文 `research-paper`、博客或网站 `research-blog` / `research-website`、社交 `research-social`、视频 `research-video`、笔记 `research-note`。研究来源只留一个，后写的换掉前一个。`research-app-store` 和 `travel-route` 没有概览行。对不上这些行的条目可以只做成员，它们留在未分组，不要为了填满去打别的系统标签。
 
 批量只放非删除的写操作。有失败项时成功的留下。不要把整批再执行一遍。先读回，只对失败的步骤用新的 operation id 重试。
 

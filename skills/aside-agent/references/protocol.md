@@ -213,17 +213,57 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 | `createItem` | 新建一条资料库条目，不是 Quick Note。只有这次 `capabilities` 的 `actions` 含有它才调用。`type` 是 `link`、`text`、`image`、`photos`、`file`、`contact`、`calendarEvent`、`place`。`note` 仍走 `createNote`。`link` 要有 `url` 和 `title`，可以带 `notes` 和 `contentType`（写入 `content.type`，必须是已有的 ContentType；缺省按 URL 识别）。`place` 要有标题和经纬度，地址可选。`image` 正好一张图，`photos` 一到九张，`file` 一个文件。新字节在 `contentBase64` 加无路径的 `filename`；已经在库里的附件不传字节，写 `sourceItemId` 和 `resourceId`。手机把来源附件目录里的普通文件复制进新条目自己的 `assets/<slug>/attachments/`，分配新的 `resourceId`，不保存 `sourceItemId`。大小沿用笔记附件限制。`text` 要有 `text`。`contact` 要有标题，正文是已有 vCard，或由电话、邮箱、组织、地址拼成 App 已保存的 `Tel:` / `Email:` 行。`calendarEvent` 要有标题、`startsAt`、`endsAt`，时区缺省为手机当前时区。可选 `collectionId`，集合必须已经存在，成员写在这条自己的 `collectionIds`。成功读回的 `resourceVersion` 是条目 JSON 字节的 SHA-256。`type: note` 拒绝，不创建。删除仍只登记手机确认 | `UserSpaceDocumentWriter.createItem` |
 | `ensureTag` | 按名称确保标签。只建标签，不挂到 item | `UserSpaceDocumentWriter.ensureTag(named:)` |
 | `updateTag` | 改名并保留 slug | `UserSpaceDocumentWriter.persistTag` |
-| `setItemTag` | `member` 为真则按名称确保标签并挂到这条 item；为假则从这条 item 拿下，标签本身还在。带当前 `resourceVersion`。已经挂上再挂一次不会重复 | `UserSpaceDocumentWriter.tagItem` / `untagItem` |
-| `createCollection`、`updateCollection` | 新建或改名，改名保留 slug | `UserSpaceDocumentWriter.persistCollection` |
+| `setItemTag` | `member` 为真则挂上，为假则拿下。`slug` 对上系统标签目录时写入该目录的固定 id，不创建同名用户标签；分组规则在下面的「模板集合」。对不上目录时仍用 `name` 按名称确保用户标签。带当前 `resourceVersion`。已经挂上再挂一次不会重复 | `addItemTag` / `removeItemTag`（系统标签）；`tagItem` / `untagItem`（用户标签） |
+| `createCollection`、`updateCollection` | 新建或改名，并可写说明和模板。请求字段是 `description`，`descriptionText` 与 `desc` 同样接受，存成 `descriptionText`。更新时不传说明就保留原来的；空白或 null 会清掉。改名保留 slug。`kind` 见「模板集合」。读回的 `description` 为空，说明这次没有写上。读回的 `kind` 仍是 `collection`，说明模板没有写上 | `UserSpaceDocumentWriter.persistCollection` |
 | `setMembership` | `member` 为真则加入，否则移出 | `addItemCollection` / `removeItemCollection` |
 | `publishCollection` | 把一个已经存在的集合按发布页的同一份计划声明出去。只有这次 `capabilities` 的 `actions` 含有它，并且 `publish.ready` 为真，才调用。凭证为空时 HTTP 403 `forbiddenError` / `arc-space`，不访问网络。`collectionId` 必须是已有集合。`visibility` 是 `public` 或 `unlisted`，`comments` 是 `off`、`open` 或 `locked`，`author` 是 `off` 或 `on`，`view` 是 `masonry`、`list` 或 `timeline`。不认识的值拒绝，不发布。`locked` 只在线上已经锁定时可以原样留下，不能改开或改关。缺省的项保持已发布记录；没有记录时用发布页默认：公开、评论关、不显示作者、瀑布流。成功返回 `url` 以及实际发出的 `visibility`、`comments`、`author`、`view`。不把整棵 `/dev` 交出去 | `CollectionPublishSheet.loadSeed`、`CollectionPublishSheet.perform` |
 | `delete` | 只登记待确认，不删除 | 无删除 |
 | `batch` | 逐项执行上面的非删除写操作 | 同上 |
 | `confirm`、`confirmDelete` | 网络上不能确认 | 返回 `aside.agent.allow` |
 
+### 模板集合
+
+`createCollection` 和 `updateCollection` 接受 `kind`。`collectionType` 同样接受，存下去的是磁盘那一列。不传就是普通集合，磁盘上没有 `collectionType`，读回 `kind` 为 `collection`。
+
+| 请求 | 读回 `kind` | 磁盘 `collectionType` | 概览 |
+| --- | --- | --- | --- |
+| 不传，或 `collection` / `general` | `collection` | 不写 | 没有 |
+| `tradeShow`、`event`、`trade-show`、`conference` | `tradeShow` | `event` | 没有。条目只在成员列表 |
+| `travel`、`trip` | `travel` | `travel` | 有 |
+| `research` | `research` | `research` | 有 |
+| `productResearch`、`research-product` | `productResearch` | `research-product` | 没有 |
+
+不认识的 `kind` 是 `invalid agent request`，不创建、不修改。更新时不传 `kind` 就保留原来的类型和 slug。
+
+展会和旅行可以带 `startsAt`、`endsAt`。值是 `yyyy-MM-dd`，也接受 ISO8601。读回是手机本地日历上的 `yyyy-MM-dd`。结束早于开始会拒绝。地点是 `locationName`、`locationAddress`、`latitude`、`longitude`。经纬度要成对。更新时不传就保留；空白或 null 清掉那一项。研究、产品研究和普通集合带上日期或地点会拒绝。展会、旅行、研究和产品研究在创建时 `captureStatus` 为 `active`。普通集合保持 `inactive`。改成普通集合不会清掉已经写下的日期。
+
+概览分组比较的是系统标签目录里的固定 UUID，不是标签显示名。`setItemTag` 用 `slug`。下表的英文名、中文名和 protocolName 也能对上唯一的一条。对上之后挂的是目录 id，不会再建一个同名用户标签。`name` 对上不止一条（例如 `Notes`）会拒绝。`slug` 不在目录里会拒绝，不会当成新标签名。用户自己的标签仍然用 `name`，对不上目录时才会创建。
+
+研究来源是单选。挂上一个来源会拿下其他 `research-*` 来源。旅行标签可以同时有多个。
+
+`travel-place` 和 `travel-visited` 只接受已经有经纬度的 `place`。挂上 `travel-visited` 时会同时挂上 `travel-place`。拿下 `travel-place` 时会同时拿下 `travel-visited`。否则这一条会进旅行概览的冲突，而不是地图。
+
+| 集合 | 概览行 | `slug` |
+| --- | --- | --- |
+| 旅行 | 照片 | 条目类型是 `image` 或 `photos`。`travel-photo` 可写，不写也会进这一行 |
+| 旅行 | 吃喝 | `travel-food` |
+| 旅行 | 攻略 | `travel-guide` |
+| 旅行 | 预订 | `travel-stay` 或 `travel-ticket` |
+| 旅行 | 随记 | `travel-note` |
+| 旅行 | 地图上的去过 | `place`，并且同时有 `travel-place` 和 `travel-visited` |
+| 旅行 | 没有这一行 | `travel-route` 只算已归类，概览不单列 |
+| 研究 | 论文 | `research-paper` |
+| 研究 | 博客和网站 | `research-blog` 或 `research-website` |
+| 研究 | 社交 | `research-social` |
+| 研究 | 视频 | `research-video` |
+| 研究 | 笔记 | `research-note` |
+| 研究 | 没有这一行 | `research-app-store` |
+
+成员用 `setMembership`，或 `createItem` 的 `collectionId`。标签不代替成员。没有合适 slug 的条目可以只进集合，它们留在未分组，不要为了填满去打别的系统标签。展会没有上面这些行。
+
 `cursor` 是十进制偏移，缺省从 0 开始。`limit` 缺省 50，钳在 1...100。不带 query 的 list 仍按 id 排序。items 的搜索顺序是索引顺序：精确 URL，精确标题，标题前缀，然后 bm25，然后 createdAt 降序。`nextCursor` 在还有剩余时给出。走完每一页不会漏。空库合法。列表项只有 `id`、`title`、`type`、`resourceVersion`。这组 `cursor`、`nextCursor` 和 1...100 的 `limit` 只属于内容动作 `list`。电脑上的条目搜索是上一节的 `arc afs search`。
 
-`resourceVersion` 是该 JSON 文件字节的 SHA-256 十六进制。它不是 schema `version`，也不是秒级 `updatedAt`。更新时不一致返回 `conflictError`（HTTP 409，`wireCode` 3），`currentCid` 是当前文件哈希，不会静默覆盖。匹配才写入。更新笔记、标签、集合、成员关系和条目上的标签时，调用 `persistItem`、`persistTag`、`persistCollection`、`addItemCollection`、`removeItemCollection`、`tagItem`、`untagItem` 之前会再读一次磁盘版本。版本已经变了就返回同一个 `conflictError`，不把旧快照写下去。这些函数进入之后、真正落盘之前仍会 await；要关上那段窗口需要改 afs。
+`resourceVersion` 是该 JSON 文件字节的 SHA-256 十六进制。它不是 schema `version`，也不是秒级 `updatedAt`。更新时不一致返回 `conflictError`（HTTP 409，`wireCode` 3），`currentCid` 是当前文件哈希，不会静默覆盖。匹配才写入。更新笔记、标签、集合、成员关系和条目上的标签时，调用 `persistItem`、`persistTag`、`persistCollection`、`addItemCollection`、`removeItemCollection`、`tagItem`、`untagItem`、`addItemTag`、`removeItemTag` 之前会再读一次磁盘版本。版本已经变了就返回同一个 `conflictError`，不把旧快照写下去。这些函数进入之后、真正落盘之前仍会 await；要关上那段窗口需要改 afs。
 
 写操作必须带 `operationId`。占位发生在 await 写入之前。同一会话、同一 `operationId`、同一规范化 JSON（键排序）若第一次还在进行，第二次等待它的结果，不开始另一次写入；完成后重放第一次的结果，不创建第二个对象。同一 `operationId` 换正文是 `conflictError`，不写，也不替换进行中的占位。成功之后从磁盘读回。创建、更新、成员变更和已确认删除都会发送 `asideItemsDidChange`：对象是 UUID 时打开的行可以 patch，接着再发一次 `object` 为 `nil`，让列表、当前页和打开的集合重新加载。笔记另发 `AUPItemDetailCanvasContentDidChange`，成员关系另发 `AUPItemDetailMembershipDidChange`。
 
