@@ -218,10 +218,12 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 | `setMembership` | `member` 为真则加入，否则移出 | `addItemCollection` / `removeItemCollection` |
 | `publishCollection` | 把一个已经存在的集合按发布页的同一份计划声明出去。只有这次 `capabilities` 的 `actions` 含有它，并且 `publish.ready` 为真，才调用。凭证为空时 HTTP 403 `forbiddenError` / `arc-space`，不访问网络。`collectionId` 必须是已有集合。`visibility` 是 `public` 或 `unlisted`，`comments` 是 `off`、`open` 或 `locked`，`author` 是 `off` 或 `on`，`view` 是 `masonry`、`list` 或 `timeline`。不认识的值拒绝，不发布。`locked` 只在线上已经锁定时可以原样留下，不能改开或改关。缺省的项保持已发布记录；没有记录时用发布页默认：公开、评论关、不显示作者、瀑布流。成功返回 `url` 以及实际发出的 `visibility`、`comments`、`author`、`view`。不把整棵 `/dev` 交出去 | `CollectionPublishSheet.loadSeed`、`CollectionPublishSheet.perform` |
 | `delete` | 只登记待确认，不删除 | 无删除 |
-| `batch` | 逐项执行上面的非删除写操作。不执行下面三个建议动作 | 同上 |
+| `batch` | 逐项执行上面的非删除写操作。不执行三个建议动作，也不执行 `listWaitingMessages` 和 `acceptWriteback` | 同上 |
 | `readSuggestions` | 读当前建议批次。没有文件时 `status` 为 `none`，有文件但 `suggestions` 为空时为 `empty`，否则为 `snapshot`。`path` 是 `agent/suggestions.json`。不写消耗记录。只有这次 `capabilities` 的 `actions` 含有它才调用 | `AgentSuggestionDisk.readSnapshot` |
 | `writeSuggestions` | 用一份快照替换当前批次。必须带 `operationId`。快照放在 `snapshot` 里，或把同样的字段放在动作旁边。`expectedRevision` 是 `snapshot` 的同级，不是快照里的字段。还没有批次时不要传它。已有批次时它必须等于上次读到的 `revision`，且新的 `generatedAt` 不早于已有的。不擦掉消耗记录。规则在「建议批次」 | `AgentSuggestionDisk.writeSnapshot` |
 | `readSuggestionConsumes` | 读手机已经点过的 `id@version`。`path` 是 `agent/suggestion-consumes.json`。电脑不能写这个文件 | `AgentSuggestionDisk.readConsumes` |
+| `listWaitingMessages` | 列出当前账号等待处理的用户消息。不领取。字段在「等待中的任务」 | `AgentDelegationMailbox.listWaiting` |
+| `acceptWriteback` | 接手一条对话里全部等待中的消息，写回资料库，并在对话里留下回答。必须带 `operationId`。没有 `writes` 是 `writes required`，消息继续等待 | `AgentDelegationMailbox.accept` |
 | `confirm`、`confirmDelete` | 网络上不能确认 | 返回 `aside.agent.allow` |
 
 ### 建议批次
@@ -254,9 +256,69 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 
 手机只在还没有对话 id 的新 Agent 对话上显示这些句子：集合的更多菜单、条目的更多菜单，或历史页的加号。首页没有这个入口。按数组顺序取出仍然有效的行，最多 3 条，不补满。语言不对、已到期、引用无效、或这个 `id@version` 已经在消耗记录里，这一行就跳过。一条有效的都没有时，显示三句自带的问题。`status` 为 `none` 或 `empty` 同样不是个性化建议。一份 `snapshot` 也可能因为每一行都被滤掉而仍显示那三句。
 
-点下去之后，手机把那句 `text` 收成这条新对话里等待处理的用户消息，并记下消耗。消耗是 `id`、`@`、`version`。替换 `agent/suggestions.json` 不会删掉 `agent/suggestion-consumes.json`。同一个 `id` 和 `version` 会一直藏着。同一个 `id` 用更大的 `version` 再写，可以再出现。写入本身不因为已经消耗过而拒绝。电脑不写消耗文件，也不替用户点。这条 exec 没有领取等待中的消息、暂存写回或完成一轮对话的动作。
+点下去之后，手机把那句 `text` 收成这条新对话里等待处理的用户消息，并记下消耗。消耗是 `id`、`@`、`version`。替换 `agent/suggestions.json` 不会删掉 `agent/suggestion-consumes.json`。同一个 `id` 和 `version` 会一直藏着。同一个 `id` 用更大的 `version` 再写，可以再出现。写入本身不因为已经消耗过而拒绝。电脑不写消耗文件，也不替用户点。接手已经发出去的任务用下一节的两个动作，不要改对话记录文件。
 
 资料库里一条条目都没有时，手机不显示建议按钮。
+
+### 等待中的任务
+
+`listWaitingMessages` 和 `acceptWriteback` 只在这次 `capabilities` 的 `actions` 里列出时才存在。没有列出时调用是 `invalid agent request`。不要放进 `batch`。这不是配对用的 `POST /agent/v1/claim`。`capabilities.writeback` 会带上 `list`、`accept` 和一句 `note`。
+
+`listWaitingMessages` 不需要 `operationId`。它只读，不领取。成功体：
+
+```json
+{
+  "ok": true,
+  "messages": [
+    {
+      "conversationId": "CONVERSATION_ID",
+      "messageId": "MESSAGE_ID",
+      "text": "用户发出的原话",
+      "state": "waiting",
+      "createdAt": "2026-10-28T07:16:10Z",
+      "origin": { "type": "item", "id": "ITEM_ID" }
+    }
+  ]
+}
+```
+
+没有 origin 时不出现 `origin`。`origin.type` 是 `item` 或 `collection`。空数组表示现在没有待接收的消息。
+
+`acceptWriteback` 走写路径，必须带新的 `operationId`。同一个 id 换正文是冲突，不写第二次。一次调用接走这一条 `conversationId` 里当前全部等待中的用户消息。`reply` 是对话里给用户看的回答。`writes` 不能空，空的是 `writes required`，消息保持等待。不认识的 `kind` 或缺少必填字段是 `invalid agent request`。
+
+| `kind` | 必填 | 作用 |
+| --- | --- | --- |
+| `appendNote` | `itemID`、`text`。`author` 缺省为 `Agent` | 在已有条目上追加笔记。条目必须已经存在 |
+| `addMembership` | `itemID`、`collectionID` | 把已有条目放进已有集合 |
+| `updateCollectionDescription` | `collectionID`、`text` | 改集合说明。不是用来挂参考链接的 |
+| `ensureCollection` | `id`、`name` | 确保一个已有 id 的集合在。不要为了归档新链接去造一个集合 |
+
+参考链接用前面的 `createItem`（`type` 为 `link`）保存，并在那里带 `collectionId`。`acceptWriteback` 不能新建条目。
+
+```json
+{
+  "action": "acceptWriteback",
+  "operationId": "OP_ID",
+  "conversationId": "CONVERSATION_ID",
+  "reply": "回答正文",
+  "writes": [
+    {
+      "kind": "appendNote",
+      "itemID": "ITEM_ID",
+      "text": "结论，以及放进这个集合的参考链接。",
+      "author": "Agent"
+    }
+  ]
+}
+```
+
+| `status` | `ok` | 含义 |
+| --- | --- | --- |
+| `accepted` | 真 | 这一轮接住了。`published` 为真表示资料库已经写上。`published` 为假且 `staged` 为真表示计划留下了，这次没有写上资料库 |
+| `nothingWaiting` | 假 | 这条对话没有待接收的消息。不要换正文再发 |
+| `writeFailed` | 假 | 写回失败。`failures` 里是 `targetID` 和 `reason`。停下来说明，不要用同一份正文反复重试 |
+
+空白或未知的 `conversationId`，或写到别的账号，也是 `invalid agent request`。
 
 ### 模板集合
 

@@ -129,7 +129,7 @@ When the phone advertises the capability, a Quick Note can hold text, images, li
 
 | Skill | Version | Use it to |
 | --- | --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | 0.4.0-beta.1 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, library items when the phone lists createItem, search and read, tags, collections (including trade show, trip, and research templates), membership, and publishing a collection when publish.ready is true. On a phone that lists writeSuggestions, also leave tap-to-send questions for a new Agent conversation. |
+| [aside-agent](./skills/aside-agent/SKILL.md) | 0.4.0-beta.2 | Connect an Aside iPhone on the same Wi-Fi and use the current library: Quick Notes, library items when the phone lists createItem, search and read, tags, collections (including trade show, trip, and research templates), membership, and publishing a collection when publish.ready is true. On a phone that lists writeSuggestions, also leave tap-to-send questions for a new Agent conversation. On a phone that lists listWaitingMessages, answer a waiting task from the library, and when that is not enough, from the agent's own understanding and the web. Save the links that were used into the related collection. |
 
 ## Maintaining this repository
 
@@ -143,7 +143,7 @@ The skill directory follows the [Agent Skills specification](https://agentskills
 
 ### Internal beta
 
-This branch is `beta/agent-conversation` at `0.4.0-beta.1`. It is not merged to `main`, and it is not the default install. The badge above reads `main`. `npx skills add ArcBlock/aside-skills` still installs `0.3.6`.
+This branch is `beta/agent-conversation` at `0.4.0-beta.2`. It is not merged to `main`, and it is not the default install. The badge above reads `main`. `npx skills add ArcBlock/aside-skills` still installs `0.3.6`.
 
 To install this beta:
 
@@ -151,7 +151,7 @@ To install this beta:
 npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation
 ```
 
-It adds `readSuggestions`, `writeSuggestions`, and `readSuggestionConsumes`. A phone that does not list those actions rejects them. Do not use this branch as the public install.
+It adds `readSuggestions`, `writeSuggestions`, `readSuggestionConsumes`, `listWaitingMessages`, and `acceptWriteback`. A phone that does not list an action rejects it. Do not use this branch as the public install.
 
 ## Contributing
 
