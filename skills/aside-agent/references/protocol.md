@@ -218,8 +218,45 @@ v1 仍是明文 TCP，不实现 TLS。监听期间注册 Bonjour，TXT 等于发
 | `setMembership` | `member` 为真则加入，否则移出 | `addItemCollection` / `removeItemCollection` |
 | `publishCollection` | 把一个已经存在的集合按发布页的同一份计划声明出去。只有这次 `capabilities` 的 `actions` 含有它，并且 `publish.ready` 为真，才调用。凭证为空时 HTTP 403 `forbiddenError` / `arc-space`，不访问网络。`collectionId` 必须是已有集合。`visibility` 是 `public` 或 `unlisted`，`comments` 是 `off`、`open` 或 `locked`，`author` 是 `off` 或 `on`，`view` 是 `masonry`、`list` 或 `timeline`。不认识的值拒绝，不发布。`locked` 只在线上已经锁定时可以原样留下，不能改开或改关。缺省的项保持已发布记录；没有记录时用发布页默认：公开、评论关、不显示作者、瀑布流。成功返回 `url` 以及实际发出的 `visibility`、`comments`、`author`、`view`。不把整棵 `/dev` 交出去 | `CollectionPublishSheet.loadSeed`、`CollectionPublishSheet.perform` |
 | `delete` | 只登记待确认，不删除 | 无删除 |
-| `batch` | 逐项执行上面的非删除写操作 | 同上 |
+| `batch` | 逐项执行上面的非删除写操作。不执行下面三个建议动作 | 同上 |
+| `readSuggestions` | 读当前建议批次。没有文件时 `status` 为 `none`，有文件但 `suggestions` 为空时为 `empty`，否则为 `snapshot`。`path` 是 `agent/suggestions.json`。不写消耗记录。只有这次 `capabilities` 的 `actions` 含有它才调用 | `AgentSuggestionDisk.readSnapshot` |
+| `writeSuggestions` | 用一份快照替换当前批次。必须带 `operationId`。快照放在 `snapshot` 里，或把同样的字段放在动作旁边。`expectedRevision` 是 `snapshot` 的同级，不是快照里的字段。还没有批次时不要传它。已有批次时它必须等于上次读到的 `revision`，且新的 `generatedAt` 不早于已有的。不擦掉消耗记录。规则在「建议批次」 | `AgentSuggestionDisk.writeSnapshot` |
+| `readSuggestionConsumes` | 读手机已经点过的 `id@version`。`path` 是 `agent/suggestion-consumes.json`。电脑不能写这个文件 | `AgentSuggestionDisk.readConsumes` |
 | `confirm`、`confirmDelete` | 网络上不能确认 | 返回 `aside.agent.allow` |
+
+### 建议批次
+
+这三个动作只在这次 `capabilities` 的 `actions` 里列出时才存在。没有列出时调用是 `invalid agent request`。正式版手机没有它们。不要放进 `batch`。`batch` 不认识这三个名字。
+
+写入和读回的快照：
+
+| 字段 | 规则 |
+| --- | --- |
+| `schemaVersion` | 必须是 `1`。别的值是 `unknown schema` |
+| `revision` | 去掉空白后非空。空的是 `empty revision`。每次成功的新批次用一个新值 |
+| `generatedAt` | ISO8601，例如 `2026-10-28T12:00:00Z`。带小数秒也可以。已有批次时早于旧的 `generatedAt` 是 `older revision` |
+| `generatorId` | 要有这个字段。用当前工具名 |
+| `suggestions` | 数组。空数组可以写下，`status` 为 `empty`，手机仍显示自带的三句。交给用户看的一批最多 3 条 |
+| `expectedRevision` | 与 `snapshot` 同级。没有旧批次时省略；写了非空值是 `revision conflict`。有旧批次时必须等于旧的 `revision`，缺省或对不上也是 `revision conflict` |
+
+每条建议：
+
+| 字段 | 规则 |
+| --- | --- |
+| `id` | 去掉空白后非空，同一批里不重复。空的是 `bad ref` |
+| `version` | 整数，从 `1` 起。小于 `1` 是 `invalid date` |
+| `text` | 去掉空白后 1 到 80 个字符，同一批里不重复。空的是 `empty text`，更长是 `text too long`。含 `<` 或 `>` 是 `markup`。这就是点下去发出去的那句话 |
+| `locale` | 跟手机界面语言对齐。界面是 `zh`、`zh-Hant`、`ja`、`en` 之一。比较前会把 `_` 换成 `-` 并转成小写。界面没有连字符时，这个语言再加一段后缀也对得上，所以 `zh-Hans` 对得上 `zh`，对不上 `zh-Hant`。`zh-Hant` 必须整段相同 |
+| `refs` | 数组，可以是空的。每一项 `type` 去掉空白并小写后只能是 `item` 或 `collection`，`id` 非空，并且是当前资料库里的条目或集合。否则是 `bad ref` 或 `inaccessible ref`。`libraryId` 省略，或等于 `aside-library`。别的非空值是 `cross library` |
+| `expiresAt` | ISO8601，必须晚于这条批次的 `generatedAt`。否则是 `invalid date`。打开页面时，不晚于当时的行会被藏起来，所以它也要晚于用户会打开手机的时刻 |
+
+同一批里 `id` 或去掉空白后的 `text` 重复，是 `duplicate`。解码不了、或写操作缺 `operationId`，是 `invalid agent request`。同一个 `operationId` 换了正文，是 `conflictError`。
+
+手机只在还没有对话 id 的新 Agent 对话上显示这些句子：集合的更多菜单、条目的更多菜单，或历史页的加号。首页没有这个入口。按数组顺序取出仍然有效的行，最多 3 条，不补满。语言不对、已到期、引用无效、或这个 `id@version` 已经在消耗记录里，这一行就跳过。一条有效的都没有时，显示三句自带的问题。`status` 为 `none` 或 `empty` 同样不是个性化建议。一份 `snapshot` 也可能因为每一行都被滤掉而仍显示那三句。
+
+点下去之后，手机把那句 `text` 收成这条新对话里等待处理的用户消息，并记下消耗。消耗是 `id`、`@`、`version`。替换 `agent/suggestions.json` 不会删掉 `agent/suggestion-consumes.json`。同一个 `id` 和 `version` 会一直藏着。同一个 `id` 用更大的 `version` 再写，可以再出现。写入本身不因为已经消耗过而拒绝。电脑不写消耗文件，也不替用户点。这条 exec 没有领取等待中的消息、暂存写回或完成一轮对话的动作。
+
+资料库里一条条目都没有时，手机不显示建议按钮。
 
 ### 模板集合
 
