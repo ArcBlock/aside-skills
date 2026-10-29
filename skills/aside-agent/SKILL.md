@@ -1,11 +1,11 @@
 ---
 name: aside-agent
-description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，把当前资料库挂到 /aside，再用 arc afs 搜索、阅读和写入。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。要把链接、文本、图片、照片、文件、联系人、日程或地点存成各自的资料库条目时，只有这次 capabilities 的 actions 含有 createItem 才调用它，不要改用 Quick Note 去凑。用户要发布某个集合时，只有 actions 含有 publishCollection 且 publish.ready 为真，才先问可见性、评论、作者和版式，再调用它。ready 不是真就说明需要登录 Arc Space，不要用账号名字判断，也不要自己编没有动作可提交的问法。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。条目搜索用 arc afs search，不要另写 HTTP 客户端。不要扫描网段，不要导出 /user、/dev 或 /kv。用户要把一个问题交给手机上新开的 Agent 对话、让他点一下就发出去时，只有这次 capabilities 的 actions 含有 writeSuggestions 才写一批建议。没有这个动作就停，不要用 createNote 去凑，也不要自己往对话记录里写消息。手机的 actions 里有 listWaitingMessages 时，接手等待中的任务。先读资料库。资料库不够把事情做完时，用自己的理解并联网检索。用到的链接用 createItem 存成 link，放进相关集合，并在相关条目上留下笔记。不要停在「收藏里没有」。
+description: 在电脑上连接同一局域网里的 Aside 手机，完成配对，把当前资料库挂到 /aside，再用 arc afs 搜索、阅读和写入。用户说「连接我的 Aside」，或要在手机上写一条笔记时使用。写笔记就是创建 Quick Note。要把链接、文本、图片、照片、文件、联系人、日程或地点存成各自的资料库条目时，只有这次 capabilities 的 actions 含有 createItem 才调用它，不要改用 Quick Note 去凑。用户要发布某个集合时，只有 actions 含有 publishCollection 且 publish.ready 为真，才先问可见性、评论、作者和版式，再调用它。ready 不是真就说明需要登录 Arc Space，不要用账号名字判断，也不要自己编没有动作可提交的问法。先浏览 Bonjour `_aside-agent._tcp`。只有一台时直接连接，多台时请用户选择。条目搜索用 arc afs search，不要另写 HTTP 客户端。不要扫描网段，不要导出 /user、/dev 或 /kv。手机的 actions 里有 listWaitingMessages 时，接手等待中的任务。先读资料库。资料库不够把事情做完时，用自己的理解并联网检索。用到的链接用 createItem 存成 link，放进相关集合，并在相关条目上留下笔记。不要停在「收藏里没有」。
 license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.4.0-beta.3"
+  version: "0.4.0-beta.4"
 ---
 
 # Aside 电脑 Skill
@@ -104,7 +104,7 @@ cd ~/.aside-agent && arc afs ls /aside --standalone --json
 
 这一步成功，连接就成功了。`/aside` 就是手机上当前登录的资料库，下面是 `items`、`collections`、`tags`。挂载失败时不要改试别的地址，不要扫描网段，也不要另写一个 HTTP 客户端。私网被拒绝时，检查 `--set allowPrivateNetwork=true` 是否真的传给了这次 `mount add`。
 
-8. 写笔记、资料库条目、发布集合，或给手机上新的 Agent 对话留一批可点的问题之前，先看能力。动作必须出现在返回的 `actions` 里。嵌入块的种类必须出现在 `note.blocks` 里。没有 `note` 时只写纯文字。没有 `createItem` 时不要调用它，也不要把链接、地点、文件或联系人改写成 Quick Note。没有 `publishCollection`，或 `publish.ready` 不是真，就不要发布，也不要先问发布配置。
+8. 写笔记、资料库条目或发布集合之前，先看能力。动作必须出现在返回的 `actions` 里。嵌入块的种类必须出现在 `note.blocks` 里。没有 `note` 时只写纯文字。没有 `createItem` 时不要调用它，也不要把链接、地点、文件或联系人改写成 Quick Note。没有 `publishCollection`，或 `publish.ready` 不是真，就不要发布，也不要先问发布配置。
 
 ```bash
 cd ~/.aside-agent && arc afs exec /aside/.actions/aside \
@@ -114,70 +114,9 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside \
 
 不要调用 `/.actions/query`。它固定拒绝，文案是 `query is not served on this library`。
 
-## 交给手机上新的 Agent 对话
-
-用户要让手机上新开的 Agent 对话出现几个可点的问题，点一下就把这句话发出去。这不是建笔记，也不是往对话里追加消息。只走同一次 `exec /aside/.actions/aside`。
-
-`actions` 里必须同时有 `readSuggestions`、`writeSuggestions`、`readSuggestionConsumes`。少了 `writeSuggestions` 就停，告诉用户这台手机不是那份内部包。不要改用 `createNote` 或 `createItem` 去凑一条任务，也不要 `arc afs write` `agent/suggestions.json`。正式版手机会把这三个动作拒成 `invalid agent request`。
-
-字段和拒绝原文在 [references/protocol.md](references/protocol.md) 的「建议批次」。下面是要做的事。
-
-1. 读当前批次。`status` 为 `none` 表示还没写过，`empty` 表示写过一份空的，`snapshot` 表示有建议。`none` 和 `empty` 都不是已经交给手机的问题。
-
-```bash
-cd ~/.aside-agent && arc afs exec /aside/.actions/aside \
-  --args '{"action":"readSuggestions"}' \
-  --standalone --json
-```
-
-2. 读已经点过的记录。替换批次不会擦掉它。不要写 `agent/suggestion-consumes.json`。
-
-```bash
-cd ~/.aside-agent && arc afs exec /aside/.actions/aside \
-  --args '{"action":"readSuggestionConsumes"}' \
-  --standalone --json
-```
-
-3. 写一份新批次。每次新的变更用新的 `operationId`。同一次重试沿用同一个 id，正文必须完全一样。换了正文是冲突。`status` 为 `none` 时不要带 `expectedRevision`，带了非空值会得到 `revision conflict`。`empty` 和 `snapshot` 都算已有批次：`expectedRevision` 放在 `snapshot` 旁边，值是上次读到的 `snapshot.revision`，`generatedAt` 不能早于已有的那一份。每次成功写入用一个新的 `revision`。
-
-一批最多写 3 条，顺序就是手机上的顺序。再多也会存下来，新对话只显示前 3 条仍然有效的。`schemaVersion` 是 `1`。`generatorId` 用当前工具名。`generatedAt` 和 `expiresAt` 是带时区的 ISO8601，例如 `2026-10-28T12:00:00Z`。`expiresAt` 必须晚于 `generatedAt`，并且晚于用户会打开手机的时刻。写入时不拿「现在」去拒绝，打开页面时已经到期的行会被藏起来。
-
-每条要有不重复的 `id`、从 `1` 起的 `version`、和去掉空白后不重复的 `text`。`text` 就是点下去会发出去的那句话，1 到 80 个字符，不能有 `<` 或 `>`。`locale` 跟手机里的 Aside 语言一致：简体 `zh`（`zh-Hans` 也可以），繁体必须是 `zh-Hant`，日文 `ja`，英文 `en`。语言对不上的行会存下来，然后被藏起，手机改显示三句自带的问题。`refs` 可以是空数组。要引用时，`type` 只能是 `item` 或 `collection`，`id` 用刚才从 `/aside/items` 或 `/aside/collections` 读到的 id。`libraryId` 不写，或写 `aside-library`。不要编 id，也不要用标题去当 id。
-
-同一条 `id` 配同一个 `version` 被点过之后，会一直藏着。要再出现，就把 `version` 加大后再写一份。不要自己去改消耗记录。
-
-```bash
-cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --args '{
-  "action": "writeSuggestions",
-  "operationId": "OP_ID",
-  "snapshot": {
-    "schemaVersion": 1,
-    "revision": "REV",
-    "generatedAt": "2026-10-28T12:00:00Z",
-    "generatorId": "当前工具名",
-    "suggestions": [
-      {
-        "id": "review-recent",
-        "version": 1,
-        "text": "帮我看看这周新存的链接",
-        "locale": "zh",
-        "refs": [{"type": "item", "id": "ITEM_ID"}],
-        "expiresAt": "2026-11-04T12:00:00Z"
-      }
-    ]
-  }
-}'
-```
-
-下一次改这份批次时，在 `snapshot` 同级加上 `"expectedRevision": "上次读到的 revision"`。
-
-4. 再读一次。`status` 为 `snapshot` 才算写上了。然后告诉用户：建议句只出现在还没有对话的新 Agent 对话里。首页连接按钮旁边有 Agent 历史，它只打开历史列表，不显示这些句子。从那一页点加号，或从集合的更多菜单里点「与 Agent 沟通」，或从条目的更多菜单进去。他应该看到刚才这几句，而不是三句自带的问题。点一句，这句话就成为这条新对话里等待处理的用户消息。历史列表里最新的一行在最上面。这次 exec 不会替他点，也不会把消息写进对话。对话页一旦已经有了对话，建议按钮会全部消失。再开一条新的，才会看到还没点过的那些。
-
-资料库里一条条目都没有时，手机不显示这些按钮。写完之后他仍看到三句自带的问题，而读回来是 `snapshot`：对一下语言、是否到期、引用是否还在库里、以及这个 `id` 和 `version` 是否已经点过。用新的 `operationId`，把刚读到的 `snapshot.revision` 放进 `expectedRevision`，再写一份。不要把那三句自带的问题抄进批次里凑数。
-
-建议这三个动作不接手已经发出去的任务。接手走下一节。没有 `listWaitingMessages` 时不要自己编。
-
 ## 接手等待中的任务
+
+用户在手机上自己发起对话。首页连接按钮旁边的 Agent 历史只打开历史列表。新对话从那一页的加号、集合更多菜单里的「与 Agent 沟通」，或条目的更多菜单开始。
 
 用户在手机上把一件事交给 Agent 之后，目标是把这件事做完。资料库是上下文，不是答案的边界。消息没有 origin，或收藏里只有标题、分享文案、成品照片，都不是停下来的理由。
 
@@ -380,7 +319,7 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --ar
 
 已有条目用 `setMembership` 放进集合，`collectionId` 用集合 id。新建条目也可以在 `createItem` 里带这个 id。然后按 [references/protocol.md](references/protocol.md) 的「模板集合」表打 `slug`。旅行概览是吃喝 `travel-food`、攻略 `travel-guide`、预订 `travel-stay` 或 `travel-ticket`、随记 `travel-note`。照片看条目类型 `image` 或 `photos`，不必再打 `travel-photo`。地图上的去过必须是带经纬度的 `place`，再打 `travel-visited`（手机会同时挂上 `travel-place`）。研究概览是论文 `research-paper`、博客或网站 `research-blog` / `research-website`、社交 `research-social`、视频 `research-video`、笔记 `research-note`。研究来源只留一个，后写的换掉前一个。`research-app-store` 和 `travel-route` 没有概览行。对不上这些行的条目可以只做成员，它们留在未分组，不要为了填满去打别的系统标签。
 
-批量只放非删除的写操作。建议的三个动作，以及 `listWaitingMessages`、`acceptWriteback`，不要放进 `batch`。有失败项时成功的留下。不要把整批再执行一遍。先读回，只对失败的步骤用新的 operation id 重试。
+批量只放非删除的写操作。`listWaitingMessages` 和 `acceptWriteback` 不要放进 `batch`。有失败项时成功的留下。不要把整批再执行一遍。先读回，只对失败的步骤用新的 operation id 重试。
 
 ```bash
 cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --args '{
@@ -439,8 +378,7 @@ cd ~/.aside-agent && arc afs mount remove /aside
 - 不要在 skill、日志或示例里放凭证、配对码或演示码。
 - 不要请求 `/user`、`/dev`、`/kv`、`/afs`。读库只用挂载点 `/aside`。
 - 不要 `arc afs write`、`arc afs delete`，也不要 exec `/.actions/query`、`confirm`、`confirmDelete`。
-- 没有 `writeSuggestions` 时，不要用 `createNote`、`createItem` 或直接写 `agent/suggestions.json` 去冒充一次交代。
-- 不要写 `agent/suggestion-consumes.json`，也不要直接改对话记录文件。接手等待中的任务只走 `listWaitingMessages` 和 `acceptWriteback`。没有这两个动作就停。
+- 不要直接改对话记录文件，也不要写 `agent/suggestions.json` 或 `agent/suggestion-consumes.json`。接手等待中的任务只走 `listWaitingMessages` 和 `acceptWriteback`。没有这两个动作就停。
 - 不要把 Muse 或其他没跑过的工具写成已经支持。
 
 ## 协议
