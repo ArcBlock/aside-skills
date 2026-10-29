@@ -129,7 +129,7 @@ Quick Note 在手机公布了相应能力时，可以包含文字、图片、链
 
 | Skill | 版本 | 你用它来 |
 | --- | --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | 0.4.0-beta.2 | 连接同一 Wi-Fi 上的 Aside iPhone，读写当前资料库：记 Quick Note，在手机列出 createItem 时创建对应类型的资料库条目，搜索和阅读，维护标签、集合（含展会、旅行、研究模板）和成员关系，并在 publish.ready 为真时发布集合。手机列出 writeSuggestions 时，还可以给一条新的 Agent 对话留下点一下就发送的问题。手机列出 listWaitingMessages 时，接手等待中的任务：先读资料库，不够就用自己的理解和互联网检索把事情做完，并把用到的链接存进相关集合。 |
+| [aside-agent](./skills/aside-agent/SKILL.md) | 0.4.0-beta.3 | 连接同一 Wi-Fi 上的 Aside iPhone，读写当前资料库：记 Quick Note，在手机列出 createItem 时创建对应类型的资料库条目，搜索和阅读，维护标签、集合（含展会、旅行、研究模板）和成员关系，并在 publish.ready 为真时发布集合。手机列出 writeSuggestions 时，还可以给一条新的 Agent 对话留下点一下就发送的问题。手机列出 listWaitingMessages 时，接手等待中的任务：先读资料库，不够就用自己的理解和互联网检索把事情做完，并把用到的链接存进相关集合。 |
 
 ## 维护这个仓库
 
@@ -143,7 +143,7 @@ Skill 的目录约定见 [Agent Skills 规范](https://agentskills.io/specificat
 
 ### 内部 beta
 
-这个分支是 `beta/agent-conversation`，版本 `0.4.0-beta.2`。它不会合并进 `main`，也不是默认安装。上面的徽章读的是 `main`。`npx skills add ArcBlock/aside-skills` 安装的仍是 `0.3.6`。
+这个分支是 `beta/agent-conversation`，版本 `0.4.0-beta.3`。它不会合并进 `main`，也不是默认安装。上面的徽章读的是 `main`。`npx skills add ArcBlock/aside-skills` 安装的仍是 `0.3.6`。
 
 安装这一版：
 

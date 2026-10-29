@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: macOS, dns-sd, curl, and the arc CLI. The phone and computer share a LAN. Transport is cleartext TCP. No TLS.
 metadata:
   author: ArcBlock
-  version: "0.4.0-beta.2"
+  version: "0.4.0-beta.3"
 ---
 
 # Aside 电脑 Skill
@@ -171,7 +171,7 @@ cd ~/.aside-agent && arc afs exec /aside/.actions/aside --standalone --json --ar
 
 下一次改这份批次时，在 `snapshot` 同级加上 `"expectedRevision": "上次读到的 revision"`。
 
-4. 再读一次。`status` 为 `snapshot` 才算写上了。然后告诉用户：新开一条 Agent 对话，从集合的更多菜单里点「与 Agent 沟通」，或从条目的更多菜单进去，或在 Agent 历史页点加号。首页没有 Agent 按钮。他应该看到刚才这几句，而不是三句自带的问题。点一句，这句话就成为这条新对话里等待处理的用户消息。历史列表里最新的一行在最上面。这次 exec 不会替他点，也不会把消息写进对话。对话页一旦已经有了对话，建议按钮会全部消失。再开一条新的，才会看到还没点过的那些。
+4. 再读一次。`status` 为 `snapshot` 才算写上了。然后告诉用户：建议句只出现在还没有对话的新 Agent 对话里。首页连接按钮旁边有 Agent 历史，它只打开历史列表，不显示这些句子。从那一页点加号，或从集合的更多菜单里点「与 Agent 沟通」，或从条目的更多菜单进去。他应该看到刚才这几句，而不是三句自带的问题。点一句，这句话就成为这条新对话里等待处理的用户消息。历史列表里最新的一行在最上面。这次 exec 不会替他点，也不会把消息写进对话。对话页一旦已经有了对话，建议按钮会全部消失。再开一条新的，才会看到还没点过的那些。
 
 资料库里一条条目都没有时，手机不显示这些按钮。写完之后他仍看到三句自带的问题，而读回来是 `snapshot`：对一下语言、是否到期、引用是否还在库里、以及这个 `id` 和 `version` 是否已经点过。用新的 `operationId`，把刚读到的 `snapshot.revision` 放进 `expectedRevision`，再写一份。不要把那三句自带的问题抄进批次里凑数。
 
