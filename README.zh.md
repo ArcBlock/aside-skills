@@ -15,58 +15,41 @@
   <a href="./README.md">English</a> | 中文
 </p>
 
-把 iPhone 上 [Aside](https://github.com/ArcBlock/aside) 里已经收好的内容，交给你电脑上正在用的 Agent。查找、记录、打标签、放进集合，写回去的仍是手机上当前这份资料库。
+把你在 [Aside](https://aside.sh) 交给 Agent 的事，交给电脑上正在用的 Agent。批准一次之后，它每 10 分钟查看这个账号，并回复最旧的一条未完成交代。
 
-Aside 用来随手把链接、图片、文件和想法收成一条条可以打开的内容，再归进标签和集合。收的时候手机最顺手。要翻很多条、把一段讨论记下来、按主题归到一起，键盘和电脑上的 Agent 更合适。这个仓库里的 skill 就是这座桥。
+## init 之后会发生什么
 
-## 连上之后可以做什么
+在 Claude Code、Cursor、Codex、Gemini CLI 或 Grok 里安装这一版，然后说「init」。Agent 会打开 https://aside.sh 上的批准页。用这个账号的 owner 登录并批准。Agent 把访问密钥留在这台电脑上，并开始定时扫描。
 
-在 Claude Code、Cursor、Codex、Gemini CLI 或 Grok 里说「连接我的 Aside」。Agent 找到同一 Wi-Fi 上打开了连接页的 iPhone，等你在手机上点允许，然后使用**当前登录的资料库**。
+每一轮查看 `/user/agent/threads`。已经有回复的交代保持原样。最旧的一条未完成交代得到一份回复，写回同一个账号。扫描不会改资料库里的收藏。
 
-**把一段话记进手机。** 「把刚才讨论的记下来」会新建一条 Quick Note。正文可以是文字。这台手机若支持富内容，还可以带图片、链接、地点、音频、文件，以及一条短视频。写完会再读一次，手机上看到的和这次写入是同一条。
-
-**把链接、地点或文件存成各自的条目。** 这台手机的能力里有 `createItem` 时，Agent 可以把链接、文字、照片、文件、联系人、日程或地点存成对应类型的资料库条目，并带上一句说明、放进已经存在的集合。Quick Note 仍然是 Quick Note。没有 `createItem` 的手机还做不到这件事。
-
-**把以前收的找出来。** 「找我存过的京都旅行」「读一下那篇笔记」。Agent 可以搜索、翻页、读正文，也可以取回图片和附件本身。
-
-**就地整理。** 「建一个『待读』集合，把这几条放进去」「给这篇加上『旅行』」。标签、集合和成员关系写回同一份库。改已有笔记时带着刚读到的版本，避免盖掉你在手机上刚做的修改。
-
-**发布一个集合。** 「帮我发布这个集合」会先问可见性、评论、作者和版式，再发布。只有这台手机列出 `publishCollection` 且 `publish.ready` 为真才会这么做。没有登录 Arc Space 时说明需要登录，不再问配置。账号名字不作为判断。
-
-**在电脑上搜索和整理同一份库。** 配对之后，资料库挂在 `/aside`。查找用 `arc afs search`，走的是手机上那份资料库索引：关键字、中文、标签、集合、类型、链接和日期。一页最多 500 条。JSON 里 `meta.hasMore` 为真时，同一条搜索加上 `--cursor` 读下一页。阅读、笔记、标签和集合也走 `arc afs`。电脑上还没有 [arc](https://arc.afsd.io) 时，先安装它。
-
-几台电脑、几个 Agent 可以同时连着。手机上能看到是哪一个工具、哪一台设备、正在做什么。点某一条可以单独断开。已经保存的改动会留下。
-
-永久删除要在手机上再确认一次。Agent 只会发起「确认删除这几项」。你点确认才会删。取消、超时或断开，内容都还在。
+电脑需要 Node.js 20 或更新版本。macOS 上批准页会自己打开。其他系统由 Agent 给出页面地址。
 
 ## 怎么用
 
-### 1. 安装
+### 1. 安装这一版
 
 ```bash
-npx skills add ArcBlock/aside-skills
+npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation
 ```
 
 > 基于 [skills](https://github.com/vercel-labs/skills)，支持 Claude Code、Cursor、Codex、Gemini CLI 以及 [其他 Agent](https://github.com/vercel-labs/skills#supported-agents)。
 
 也可以直接告诉 Agent：
 
-> 请从 github.com/ArcBlock/aside-skills 安装 Skills
+> 请从 https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation 安装这个 skill
 
 <details>
 <summary><b>通过 Claude Code 插件市场安装</b></summary>
 
-```text
-/plugin marketplace add ArcBlock/aside-skills
-/plugin install aside@aside-skills
-```
+添加这个仓库，再从 beta 分支安装 `aside` 插件。默认的市场命令跟踪 `main`，那一版仍是原来的手机 skill。
 
 </details>
 
 <details>
 <summary><b>手动复制</b></summary>
 
-复制整个 `skills/aside-agent`。`SKILL.md` 和 `references/` 要在一起。
+复制整个 `skills/aside-agent`。`SKILL.md`、`references/` 和 `scripts/` 要在一起。
 
 | Agent | 位置 |
 | --- | --- |
@@ -75,75 +58,47 @@ npx skills add ArcBlock/aside-skills
 | Cursor | `~/.cursor/skills/aside-agent` 或项目里的 `.cursor/skills/aside-agent` |
 | Grok | `~/.grok/skills/aside-agent` |
 
-电脑侧在 macOS 上使用。发现手机用系统自带的 Bonjour。读写资料库用 [arc](https://arc.afsd.io)。
-
 </details>
 
-### 2. 在 iPhone 上打开连接
+### 2. 说 init
 
-打开 Aside，在首页点「连接 Agent」（链接图标）。页面变成「等待连接」，并写着：在电脑上说「连接我的 Aside」。
+> init
 
-第一次打开时，系统可能询问本地网络权限，需要允许。
+Agent 会给出一个短码和 https://aside.sh 上的地址。用 owner 身份批准。短码大约 5 分钟内有效。批准之后，访问密钥留在这台电脑的 `~/.aside-agent/mcp-token`。Agent 不会打印这把密钥。
 
-打开之后可以离开这一页。切到别的 App、锁屏或离开较久，已经允许的授权还会留着。监听会先停，把 Aside 唤醒到前台后会自己重新打开，不用重新配对。点「结束连接」或断开某一条，才会取消那一份授权。切换资料库或账号不会取消授权。
+### 3. 让扫描继续跑
 
-手机和电脑连同一个 Wi-Fi。
+Agent 只装一个定时任务。每 10 分钟回复最旧的一条未完成交代，语言跟那条交代一致。任务过期或被删掉之后，再说一次 init。不需要第二个任务。
 
-### 3. 在电脑上说一句
+在 Grok 里，定时任务在那个会话开着时运行。标成 durable 的任务会在下次打开会话时补跑一次。大约 7 天后过期。
 
-> 连接我的 Aside
+### 4. 在 Aside 里把事情交出去
 
-只有一台手机时，Agent 直接连。有多台时，对照手机页面末尾的四位标记来选。页面不显示 IP 和端口。
-
-Agent 会把工具名、电脑名和六位配对码发到对话里。在手机上核对同一组码，点允许。码大约 60 秒内有效。允许之前，它读不到正文、附件、标签和集合。
-
-连上后，手机显示「已连接」，以及当前有几个 Agent 会话。
-
-### 4. 接着说你要做的事
-
-- 「找我这周存的关于发布的内容，读给我」
-- 「把下面这段记成一条笔记，标题写『周一讨论』」
-- 「建一个集合叫『待整理』，把刚读到的那几条放进去」
-- 「给这篇笔记加上标签『旅行』」
-- 「这篇笔记只改第二段，其他块留着」
-
-这次允许没有时钟过期。你在手机上断开这一条之前，同一份授权还能用。新的电脑或新的 Agent 仍要再点一次允许。
-
-### 5. 结束
-
-在手机上点「结束连接」。已经写入的笔记、标签和集合留在资料库里。锁屏不会取消这次授权。
+在 Aside 提交一条交代。下一轮会读到它。交代指向收藏的条目或集合时，Agent 先读那一份再回答。没有打开过的页面不会被引用。
 
 ## 内容会怎么被碰到
 
-允许发生在手机上。Skill 里的说明不能代替那一次点击。
+批准发生在浏览器里，身份是账号 owner。Skill 里的说明不能代替那一次批准。
 
-开始读资料库之前，Agent 会告诉你：你使用的 AI 工具可能会将读取的内容发送到它的云端服务。
+这把访问密钥可以通过 Aside 的 MCP 读写该账号。它放在 `~/.aside-agent/` 下权限为 `0600` 的文件里。你使用的 AI 工具可能会把读到的内容发到它自己的云端服务。
 
-这一版走局域网明文 TCP。配对码和会话凭证在失效之前，同一个 Wi-Fi 上的观察者有可能看见。只在你信任的网络上打开连接页。
-
-Agent 使用的是当前登录资料库里的条目、集合和标签。账号目录、开发接口和其他系统目录不在这次连接里。
-
-Quick Note 在手机公布了相应能力时，可以包含文字、图片、链接、地点、音频、文件和一条视频。图片最多 9 张，视频最多 1 条、时长不超过 15 秒。手机只接受纯文字时，Agent 只写文字。
+这一版不和局域网里的手机配对。
 
 ## 现在的 skill
 
 | Skill | 版本 | 你用它来 |
 | --- | --- | --- |
-| [aside-agent](./skills/aside-agent/SKILL.md) | 0.4.0-beta.4 | 连接同一 Wi-Fi 上的 Aside iPhone，读写当前资料库：记 Quick Note，在手机列出 createItem 时创建对应类型的资料库条目，搜索和阅读，维护标签、集合（含展会、旅行、研究模板）和成员关系，并在 publish.ready 为真时发布集合。手机列出 listWaitingMessages 时，接手等待中的任务：先读资料库，不够就用自己的理解和互联网检索把事情做完，并把用到的链接存进相关集合。 |
+| [aside-agent](./skills/aside-agent/SKILL.md) | 0.5.0-beta.1 | 说 init，批准 https://aside.sh，然后每 10 分钟回复最旧的一条未完成交代。 |
 
 ## 维护这个仓库
 
-iOS 应用、内容终端和工程协议在 [ArcBlock/aside](https://github.com/ArcBlock/aside)。这里只维护电脑上的 Agent 怎么连、怎么读写。手机行为先改 Aside，再改这里的 skill。
-
-这个仓库不再带电脑端客户端。库操作是 `arc afs`。
-
-`skills/aside-agent/references/protocol.md` 是给 Agent 读的协议副本。工程原文是 Aside 仓库里的 `design/aside-agent-mode/PROTOCOL.md`。两边可以不一致。某台手机接受什么，以它连接后返回的 `capabilities` 为准。
+Aside 应用和账号在 [ArcBlock/aside](https://github.com/ArcBlock/aside)。这里维护电脑上的 Agent 怎么授权、怎么回复。Agent 要遵守的目录格式在 `skills/aside-agent/references/protocol.md`。唯一的 HTTP 客户端是 `skills/aside-agent/scripts/aside-cloud.mjs`。
 
 Skill 的目录约定见 [Agent Skills 规范](https://agentskills.io/specification)。Agent 启动时读名称和描述，任务对上了再读全文。
 
 ### 内部 beta
 
-这个分支是 `beta/agent-conversation`，版本 `0.4.0-beta.4`。它不会合并进 `main`，也不是默认安装。上面的徽章读的是 `main`。`npx skills add ArcBlock/aside-skills` 安装的仍是 `0.3.6`。
+这个分支是 `beta/agent-conversation`，版本 `0.5.0-beta.1`。它不会合并进 `main`，也不是默认安装。上面的徽章读的是 `main`。`npx skills add ArcBlock/aside-skills` 安装的仍是 `0.3.6`。
 
 安装这一版：
 
@@ -151,7 +106,7 @@ Skill 的目录约定见 [Agent Skills 规范](https://agentskills.io/specificat
 npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation
 ```
 
-它多了 `listWaitingMessages`、`acceptWriteback`。它不再包含建议批次。手机的 `actions` 里没有的名字会拒绝。不要把这个分支当成对外安装。
+不要把这个分支当成对外安装。
 
 ## 参与贡献
 
@@ -159,7 +114,7 @@ npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversa
 
 ## 相关项目
 
-- [Aside](https://github.com/ArcBlock/aside) — iPhone 上的个人内容应用，首页有「连接 Agent」
+- [Aside](https://aside.sh) — 这个 skill 授权的账号
 - [Agent Skills 规范](https://agentskills.io/specification)
 
 ## 作者
