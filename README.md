@@ -21,13 +21,13 @@ Let the agent you already use on your computer answer requests you hand it from 
 
 In Claude Code, Cursor, Codex, Gemini CLI, or Grok, send:
 
-> Install the aside-agent skill from https://github.com/ArcBlock/aside-skills, connect to my Aside, and wait for my instructions.
+> Install the aside-agent skill from https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation, connect to my Aside, and wait for my instructions.
 
 That sentence is the whole setup. The agent installs this skill, opens the approval page on https://aside.sh, starts a scan every 10 minutes, and waits. Approve as the owner of the account. You do not run an install command yourself, and you do not send a second message to start the connection.
 
 An agent that reads this repository does those steps in the same turn:
 
-1. `npx skills add https://github.com/ArcBlock/aside-skills`
+1. `npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation`
 2. Follow [skills/aside-agent/SKILL.md](./skills/aside-agent/SKILL.md) and connect before the turn ends.
 3. Wait for the next message.
 
@@ -59,7 +59,7 @@ The Aside app and the account live in [ArcBlock/aside](https://github.com/ArcBlo
 
 The skill directory follows the [Agent Skills specification](https://agentskills.io/specification). An agent reads the name and description at startup, then loads the full instructions when the task matches.
 
-`npx skills add https://github.com/ArcBlock/aside-skills` installs this skill from the default branch.
+`npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation` installs this beta. The default branch is unchanged.
 
 ## Contributing
 

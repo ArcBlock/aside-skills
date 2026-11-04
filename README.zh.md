@@ -21,13 +21,13 @@
 
 在 Claude Code、Cursor、Codex、Gemini CLI 或 Grok 里发：
 
-> Install the aside-agent skill from https://github.com/ArcBlock/aside-skills, connect to my Aside, and wait for my instructions.
+> Install the aside-agent skill from https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation, connect to my Aside, and wait for my instructions.
 
 这一句就是全部安装。Agent 会装上这个 skill，打开 https://aside.sh 的批准页，开始每 10 分钟一次的扫描，然后等待。用这个账号的 owner 批准。不需要自己执行安装命令，也不需要再发一句来启动连接。
 
 读到这个仓库的 Agent，在同一轮里做完：
 
-1. `npx skills add https://github.com/ArcBlock/aside-skills`
+1. `npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation`
 2. 按 [skills/aside-agent/SKILL.md](./skills/aside-agent/SKILL.md) 完成连接，再结束这一轮。
 3. 等用户的下一句。
 
@@ -59,7 +59,7 @@ Aside 应用和账号在 [ArcBlock/aside](https://github.com/ArcBlock/aside)。�
 
 Skill 的目录约定见 [Agent Skills 规范](https://agentskills.io/specification)。Agent 启动时读名称和描述，任务对上了再读全文。
 
-`npx skills add https://github.com/ArcBlock/aside-skills` 从默认分支安装这个 skill。
+`npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation` 安装这个 beta。默认分支保持原样。
 
 ## 参与贡献
 

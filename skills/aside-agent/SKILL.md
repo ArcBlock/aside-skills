@@ -1,6 +1,6 @@
 ---
 name: aside-agent
-description: 用户说 “Install the aside-agent skill from https://github.com/ArcBlock/aside-skills, connect to my Aside, and wait for my instructions.” 或 “connect to my Aside” 时，在同一轮安装这个 skill、完成 https://aside.sh 的 MCP 授权，并装好每 10 分钟扫描 /user/agent/threads 的定时任务，然后等待。init 也走这一轮。回复只走 scripts/aside-cloud.mjs 的 list 和 write。
+description: 用户说 “Install the aside-agent skill from https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation, connect to my Aside, and wait for my instructions.” 或 “connect to my Aside” 时，在同一轮安装这个 skill、完成 https://aside.sh 的 MCP 授权，并装好每 10 分钟扫描 /user/agent/threads 的定时任务，然后等待。init 也走这一轮。回复只走 scripts/aside-cloud.mjs 的 list 和 write。
 license: Apache-2.0
 compatibility: Node.js 20 or newer. The account owner approves in a browser. macOS opens that page; other systems print the URL.
 metadata:
@@ -20,14 +20,14 @@ metadata:
 
 下面这句在同一轮里做完安装、授权和定时任务，然后等待。不要再请用户发第二句，也不要再请用户说 init。
 
-> Install the aside-agent skill from https://github.com/ArcBlock/aside-skills, connect to my Aside, and wait for my instructions.
+> Install the aside-agent skill from https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation, connect to my Aside, and wait for my instructions.
 
 「connect to my Aside」和 init 也是这一轮。
 
 本文件旁边已经有 `scripts/aside-cloud.mjs` 时，直接用这个目录。还没有时，先运行一次：
 
 ```bash
-npx skills add https://github.com/ArcBlock/aside-skills
+npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation
 ```
 
 用它装好的 `skills/aside-agent` 绝对路径继续。名称可用 `--name`，缺省是 `Aside agent`。
