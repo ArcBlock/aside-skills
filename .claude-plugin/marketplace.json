@@ -5,7 +5,7 @@
     "email": "contact@arcblock.io"
   },
   "metadata": {
-    "description": "Agent Skills for Aside. Authorize https://aside.sh and answer the oldest open agent request every 10 minutes.",
+    "description": "Agent Skills for Aside. One sentence installs the skill, connects to https://aside.sh, and answers the oldest open request every 10 minutes.",
     "version": "0.5.0-beta.1"
   },
   "plugins": [

@@ -1,6 +1,6 @@
 ---
 name: aside-agent
-description: 在 https://aside.sh 上接手交给 Agent 的事。用户说 init、初始化、连接 aside.sh，或要回复云端交代时使用。init 用设备码完成 MCP 授权，并把每 10 分钟扫描 /user/agent/threads 的定时任务装好。回复只走 scripts/aside-cloud.mjs 的 list 和 write。
+description: 用户说 “Install the aside-agent skill from https://github.com/ArcBlock/aside-skills, connect to my Aside, and wait for my instructions.” 或 “connect to my Aside” 时，在同一轮安装这个 skill、完成 https://aside.sh 的 MCP 授权，并装好每 10 分钟扫描 /user/agent/threads 的定时任务，然后等待。init 也走这一轮。回复只走 scripts/aside-cloud.mjs 的 list 和 write。
 license: Apache-2.0
 compatibility: Node.js 20 or newer. The account owner approves in a browser. macOS opens that page; other systems print the URL.
 metadata:
@@ -16,9 +16,21 @@ metadata:
 
 访问密钥在 `~/.aside-agent/mcp-token`，权限 `0600`。脚本自己读这个文件。不要打印密钥，不要把它放进环境变量、命令行或对话。
 
-## init
+## 连接
 
-用户说 init 时做完授权，再装上定时任务。名称可用 `--name`，缺省是 `Aside agent`。
+下面这句在同一轮里做完安装、授权和定时任务，然后等待。不要再请用户发第二句，也不要再请用户说 init。
+
+> Install the aside-agent skill from https://github.com/ArcBlock/aside-skills, connect to my Aside, and wait for my instructions.
+
+「connect to my Aside」和 init 也是这一轮。
+
+本文件旁边已经有 `scripts/aside-cloud.mjs` 时，直接用这个目录。还没有时，先运行一次：
+
+```bash
+npx skills add https://github.com/ArcBlock/aside-skills
+```
+
+用它装好的 `skills/aside-agent` 绝对路径继续。名称可用 `--name`，缺省是 `Aside agent`。
 
 脚本和协议都用绝对路径。下面写成 `SCRIPT` 和 `PROTOCOL`。
 
@@ -53,8 +65,8 @@ metadata:
 不要修改资料库收藏，不要调用 apply_effect。
 ```
 
-在 Grok 里先看已有的定时任务。没有这一轮扫描时，用 `scheduler_create`：`interval` 为 `10m`，`durable` 为 true，`fire_immediately` 为 true。init 自己不要再回复这一轮。Grok 的定时任务在会话开着时运行；`durable` 只保证下次打开会话补跑一次。任务大约 7 天后过期，过期后再说一次 init。
+在 Grok 里先看已有的定时任务。没有这一轮扫描时，用 `scheduler_create`：`interval` 为 `10m`，`durable` 为 true，`fire_immediately` 为 true。这一轮自己不要再回复交代。Grok 的定时任务在会话开着时运行；`durable` 只保证下次打开会话补跑一次。任务大约 7 天后过期，过期后用户再发一次上面那句连接的话。
 
-其他宿主用它自己的每 10 分钟重复一次的任务，提示词用上面那段。任务会马上跑时，init 自己不要再回复。没有这种能力时，告诉用户，并当场跑一轮。
+其他宿主用它自己的每 10 分钟重复一次的任务，提示词用上面那段。任务会马上跑时，这一轮自己不要再回复。没有这种能力时，告诉用户，并当场跑一轮。
 
-授权和定时任务都就绪后，告诉用户：授权已经完成，每 10 分钟会扫描一次未完成的交代。
+授权和定时任务都就绪后，告诉用户：授权已经完成，每 10 分钟会扫描一次未完成的交代。然后等待，不要再问下一步。
