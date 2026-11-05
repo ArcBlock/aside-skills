@@ -28,11 +28,13 @@
 | `source.type` | 内容 | 回复前 |
 | --- | --- | --- |
 | `none` | 只有 `{"type":"none"}` | 按 `instruction` 做 |
-| `item` | `type`、`id`、`label` | `node SCRIPT read --path /user/items/<id>.json` |
-| `collection` | `type`、`id`、`label` | `node SCRIPT read --path /user/collections/<id>.json` |
+| `item` | `type`、`id`、`label` | `node SCRIPT read --item <id>` |
+| `collection` | `type`、`id`、`label` | `node SCRIPT read --collection <id>` |
 | `share` | `type`、`label` | 把 `label` 当上下文，没有资料库文件 |
 
-`read` 打印 `NOT_FOUND` 时，说明这份资料没有打开。不要编它的正文。打印 `UNCHECKED` 时这一轮不要回复。`read` 只接受 `/user/items/`、`/user/collections/` 和 `/user/agent/threads/` 下面的路径。
+`id` 是记录内部的 id。云端文件名是 slug，例如 `/user/collections/家庭菜谱--8a82d3e4.json`，不是这个 id。`--collection` 按内部 id 找到集合，并列出其中条目的路径和标题。要某一条的正文，再用 `read --item <id>`，或 `read --path` 刚才列出的路径。
+
+`read` 打印 `NOT_FOUND` 时，说明这份资料没有打开。不要编它的正文。打印 `UNCHECKED` 时这一轮不要回复。`read --path` 只接受 `/user/items/`、`/user/collections/` 和 `/user/agent/threads/` 下面的路径。
 
 事实以你打开过的页面为准。说清楚哪一段来自资料库，哪一段来自打开的页面。页面打不开时，用你的理解把交代做完，并说明这一页没有打开。
 

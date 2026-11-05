@@ -8,7 +8,9 @@
  *   node aside-cloud.mjs auth
  *   node aside-cloud.mjs auth --wait
  *   node aside-cloud.mjs list
- *   node aside-cloud.mjs read --path /user/items/<id>.json
+ *   node aside-cloud.mjs read --collection <id>
+ *   node aside-cloud.mjs read --item <id>
+ *   node aside-cloud.mjs read --path /user/items/<slug>.json
  *   node aside-cloud.mjs write --request req-... --title ... --summary ... --body-file note.json
  *   node aside-cloud.mjs self-test
  */
@@ -584,6 +586,156 @@ function validateBody(noteDocument) {
   return "";
 }
 
+const SENSITIVE_KEYS = new Set([
+  "captureLocationHint",
+  "captureLocationName",
+  "captureLocationAddress",
+  "captureLocationLatitude",
+  "captureLocationLongitude",
+]);
+
+function queryData(text) {
+  const marker = "DATA ";
+  const index = text.indexOf(marker);
+  if (index < 0) return null;
+  return JSON.parse(text.slice(index + marker.length).trim());
+}
+
+function publicRecord(value) {
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const key of Object.keys(value)) {
+    if (!SENSITIVE_KEYS.has(key)) out[key] = value[key];
+  }
+  return out;
+}
+
+async function queryRecords(token, args) {
+  const rows = [];
+  const seen = new Set();
+  let cursor;
+  do {
+    const queried = await mcp(token, "afs_exec", {
+      path: "/.actions/query",
+      args: cursor ? { ...args, cursor } : args,
+    });
+    if (queried.network) return { network: true };
+    if (queried.http === 401) return { auth: true };
+    if (!queried.text.includes("STATUS SUCCESS")) return { fail: queried.text };
+    const data = queryData(queried.text);
+    if (!data) return { fail: queried.text };
+    rows.push(...(data.entries ?? []));
+    if (!data.cursor || seen.has(data.cursor) || seen.size >= 20) cursor = undefined;
+    else {
+      seen.add(data.cursor);
+      cursor = data.cursor;
+    }
+  } while (cursor);
+  return { rows };
+}
+
+async function readCollection(id) {
+  const token = readToken();
+  if (stopForGate(await signedIn(token))) return;
+  const found = await queryRecords(token, {
+    path: "/user/collections",
+    where: { field: "id", eq: id },
+    limit: 5,
+  });
+  if (found.network) {
+    console.log("UNCHECKED");
+    process.exitCode = 3;
+    return;
+  }
+  if (found.auth) {
+    console.log("AUTH");
+    process.exitCode = 2;
+    return;
+  }
+  if (found.fail) {
+    console.log("FAIL");
+    console.log(redact(found.fail).slice(0, 300));
+    process.exitCode = 3;
+    return;
+  }
+  if (found.rows.length === 0) {
+    console.log("NOT_FOUND");
+    return;
+  }
+  const record = publicRecord(found.rows[0].content);
+  const members = await queryRecords(token, {
+    path: "/user/items",
+    where: { field: "collectionIds", contains: record.id },
+    select: ["id", "title"],
+    limit: 50,
+  });
+  if (members.network) {
+    console.log("UNCHECKED");
+    process.exitCode = 3;
+    return;
+  }
+  if (members.auth) {
+    console.log("AUTH");
+    process.exitCode = 2;
+    return;
+  }
+  if (members.fail) {
+    console.log("FAIL");
+    console.log(redact(members.fail).slice(0, 300));
+    process.exitCode = 3;
+    return;
+  }
+  console.log("READ");
+  console.log(found.rows[0].path);
+  console.log(canonical(record));
+  console.log(`MEMBERS ${members.rows.length}`);
+  for (const row of members.rows) {
+    const title = String(row.content?.title ?? "").split("\n")[0].slice(0, 80);
+    console.log(`${row.path}\t${title}`);
+  }
+}
+
+async function readItem(id) {
+  const token = readToken();
+  if (stopForGate(await signedIn(token))) return;
+  const found = await queryRecords(token, {
+    path: "/user/items",
+    where: { field: "id", eq: id },
+    limit: 5,
+  });
+  if (found.network) {
+    console.log("UNCHECKED");
+    process.exitCode = 3;
+    return;
+  }
+  if (found.auth) {
+    console.log("AUTH");
+    process.exitCode = 2;
+    return;
+  }
+  if (found.fail) {
+    console.log("FAIL");
+    console.log(redact(found.fail).slice(0, 300));
+    process.exitCode = 3;
+    return;
+  }
+  if (found.rows.length === 0) {
+    console.log("NOT_FOUND");
+    return;
+  }
+  console.log("READ");
+  console.log(found.rows[0].path);
+  const body = canonical(publicRecord(found.rows[0].content));
+  console.log(body.length > 80_000 ? `${body.slice(0, 80_000)}\nTRUNCATED` : body);
+}
+
 async function readPath() {
   const path = argValue("--path");
   if (!allowRead(path)) {
@@ -803,6 +955,10 @@ function selfTest() {
   requests.sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.requestId.localeCompare(right.requestId));
   if (requests[0].requestId !== "req-cccccccc-cccc-4ccc-8ccc-cccccccccccc") throw new Error("oldest");
   if (requests[1].requestId !== "req-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa") throw new Error("tie break");
+  const parsed = queryData('STATUS SUCCESS\nDATA {"entries":[],"total":0}');
+  if (!parsed || parsed.total !== 0) throw new Error("query data");
+  const record = publicRecord('{"id":"ABC","name":"菜","captureLocationLatitude":1}');
+  if (record.id !== "ABC" || record.name !== "菜" || "captureLocationLatitude" in record) throw new Error("record");
   if (!allowRead("/user/items/abc.json")) throw new Error("allow item");
   if (allowRead("/user/items/../.secrets")) throw new Error("reject traversal");
   if (allowRead("/user/agent/installations/agt.json")) throw new Error("reject installation");
@@ -816,6 +972,8 @@ async function main() {
   else if (command === "auth" && hasFlag("--wait")) await waitAuth(name);
   else if (command === "auth") await beginAuth(name);
   else if (command === "list") await listOpen();
+  else if (command === "read" && argValue("--collection")) await readCollection(argValue("--collection"));
+  else if (command === "read" && argValue("--item")) await readItem(argValue("--item"));
   else if (command === "read") await readPath();
   else if (command === "write") await writeReply();
   else {
