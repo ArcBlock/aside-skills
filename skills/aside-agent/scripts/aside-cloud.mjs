@@ -641,14 +641,42 @@ async function queryRecords(token, args) {
   return { rows };
 }
 
+function bareKey(value) {
+  const name = String(value ?? "").trim().split("/").pop();
+  return name.toLowerCase().endsWith(".json") ? name.slice(0, -".json".length) : name;
+}
+
+async function resolveRecord(token, dir, key) {
+  const bare = bareKey(key);
+  if (!bare || bare.includes("..")) return { rows: [] };
+  const byId = await queryRecords(token, {
+    path: dir,
+    where: { field: "id", eq: key },
+    limit: 5,
+  });
+  if (byId.network || byId.auth || byId.fail) return byId;
+  if (byId.rows.length > 0) return byId;
+  const bySlug = await queryRecords(token, {
+    path: dir,
+    where: { field: "slug", eq: bare },
+    limit: 5,
+  });
+  if (bySlug.network || bySlug.auth) return bySlug;
+  if (bySlug.rows?.length > 0) return bySlug;
+  const path = `${dir}/${bare}.json`;
+  const read = await mcp(token, "afs_read", { path });
+  if (read.network) return { network: true };
+  if (read.http === 401) return { auth: true };
+  const json = contentJson(read.text);
+  if (read.ok && json) return { rows: [{ path, content: json }] };
+  if (bySlug.fail) return bySlug;
+  return { rows: [] };
+}
+
 async function readCollection(id) {
   const token = readToken();
   if (stopForGate(await signedIn(token))) return;
-  const found = await queryRecords(token, {
-    path: "/user/collections",
-    where: { field: "id", eq: id },
-    limit: 5,
-  });
+  const found = await resolveRecord(token, "/user/collections", id);
   if (found.network) {
     console.log("UNCHECKED");
     process.exitCode = 3;
@@ -705,11 +733,7 @@ async function readCollection(id) {
 async function readItem(id) {
   const token = readToken();
   if (stopForGate(await signedIn(token))) return;
-  const found = await queryRecords(token, {
-    path: "/user/items",
-    where: { field: "id", eq: id },
-    limit: 5,
-  });
+  const found = await resolveRecord(token, "/user/items", id);
   if (found.network) {
     console.log("UNCHECKED");
     process.exitCode = 3;
@@ -959,6 +983,8 @@ function selfTest() {
   if (!parsed || parsed.total !== 0) throw new Error("query data");
   const record = publicRecord('{"id":"ABC","name":"菜","captureLocationLatitude":1}');
   if (record.id !== "ABC" || record.name !== "菜" || "captureLocationLatitude" in record) throw new Error("record");
+  if (bareKey("/user/collections/家庭菜谱--8a82d3e4.json") !== "家庭菜谱--8a82d3e4") throw new Error("slug");
+  if (bareKey("8A82D3E4-E44C-4D6B-8151-DF757556A37A") !== "8A82D3E4-E44C-4D6B-8151-DF757556A37A") throw new Error("id");
   if (!allowRead("/user/items/abc.json")) throw new Error("allow item");
   if (allowRead("/user/items/../.secrets")) throw new Error("reject traversal");
   if (allowRead("/user/agent/installations/agt.json")) throw new Error("reject installation");

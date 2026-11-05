@@ -32,7 +32,7 @@
 | `collection` | `type`、`id`、`label` | `node SCRIPT read --collection <id>` |
 | `share` | `type`、`label` | 把 `label` 当上下文，没有资料库文件 |
 
-`id` 是记录内部的 id。云端文件名是 slug，例如 `/user/collections/家庭菜谱--8a82d3e4.json`，不是这个 id。`--collection` 按内部 id 找到集合，并列出其中条目的路径和标题。要某一条的正文，再用 `read --item <id>`，或 `read --path` 刚才列出的路径。
+`--collection` 和 `--item` 同时接受内部 id 和 slug。`8a82d3e4-e44c-4d6b-8151-df757556a37a` 与 `家庭菜谱--8a82d3e4` 打开同一条集合。集合结果里有文件路径，以及其中条目的路径和标题。要某一条的正文，再用 `read --item` 传它的 id 或 slug，或 `read --path` 刚才列出的路径。
 
 `read` 打印 `NOT_FOUND` 时，说明这份资料没有打开。不要编它的正文。打印 `UNCHECKED` 时这一轮不要回复。`read --path` 只接受 `/user/items/`、`/user/collections/` 和 `/user/agent/threads/` 下面的路径。
 

@@ -24,13 +24,13 @@ metadata:
 
 「connect to my Aside」和 init 也是这一轮。
 
-本文件旁边已经有 `scripts/aside-cloud.mjs` 时，直接用这个目录。还没有时，先运行一次：
+用户这句是在要求安装或更新。即使旁边已经有 `scripts/aside-cloud.mjs`，也再运行一次，然后改用新装出来的目录：
 
 ```bash
-npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation
+npx skills add https://github.com/ArcBlock/aside-skills/tree/beta/agent-conversation -y
 ```
 
-用它装好的 `skills/aside-agent` 绝对路径继续。名称可用 `--name`，缺省是 `Aside agent`。
+名称可用 `--name`，缺省是 `Aside agent`。
 
 脚本和协议都用绝对路径。下面写成 `SCRIPT` 和 `PROTOCOL`。
 
