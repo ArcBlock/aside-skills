@@ -1,7 +1,7 @@
 # Aside Skills
 
 <p align="center">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FArcBlock%2Faside-skills%2Fmain%2F.claude-plugin%2Fmarketplace.json&query=%24.metadata.version&label=version&style=for-the-badge&color=blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.5.0-blue?style=for-the-badge" alt="Version 0.5.0">
   <img src="https://img.shields.io/badge/Agent_Skill-blueviolet?style=for-the-badge" alt="Agent Skill">
   <a href="https://github.com/ArcBlock/aside-skills/blob/main/LICENSE.md">
     <img src="https://img.shields.io/badge/license-Apache%202.0-green?style=for-the-badge" alt="License">
